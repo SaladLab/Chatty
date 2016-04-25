@@ -1,0 +1,66 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25123.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain", "src\Domain\Domain.csproj", "{6B7E6E87-B18B-46DC-B477-BD566C3F0FF4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Domain", "Domain", "{36DFBE33-AD59-40EF-963F-34C9F07FB252}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TalkClient", "TalkClient", "{CA294440-FE4E-49F1-A1EF-C16891756DA5}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TalkServer", "TalkServer", "{B621C787-FD54-4673-8D03-C3A5F0220A72}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain.SlimClient", "src\Domain.SlimClient\Domain.SlimClient.csproj", "{59DAF660-6EF7-4945-A592-44E5141D82C8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain.SlimClient.Net35", "src\Domain.SlimClient.Net35\Domain.SlimClient.Net35.csproj", "{6922A8AF-A17F-4A9F-A9C4-3E467E23D818}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TalkClient.Console", "src\TalkClient.Console\TalkClient.Console.csproj", "{7AAE865F-E62B-4DA9-8D7D-29C752FAA697}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TalkServer", "src\TalkServer\TalkServer.csproj", "{4C221954-A2E4-491C-B278-667E0DF32F73}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TalkServer.Tests", "src\TalkServer.Tests\TalkServer.Tests.csproj", "{F01CDE0A-AB31-4789-B732-E69B39A40E7B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6B7E6E87-B18B-46DC-B477-BD566C3F0FF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B7E6E87-B18B-46DC-B477-BD566C3F0FF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B7E6E87-B18B-46DC-B477-BD566C3F0FF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B7E6E87-B18B-46DC-B477-BD566C3F0FF4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{59DAF660-6EF7-4945-A592-44E5141D82C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{59DAF660-6EF7-4945-A592-44E5141D82C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{59DAF660-6EF7-4945-A592-44E5141D82C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{59DAF660-6EF7-4945-A592-44E5141D82C8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6922A8AF-A17F-4A9F-A9C4-3E467E23D818}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6922A8AF-A17F-4A9F-A9C4-3E467E23D818}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6922A8AF-A17F-4A9F-A9C4-3E467E23D818}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6922A8AF-A17F-4A9F-A9C4-3E467E23D818}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7AAE865F-E62B-4DA9-8D7D-29C752FAA697}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7AAE865F-E62B-4DA9-8D7D-29C752FAA697}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7AAE865F-E62B-4DA9-8D7D-29C752FAA697}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7AAE865F-E62B-4DA9-8D7D-29C752FAA697}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C221954-A2E4-491C-B278-667E0DF32F73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C221954-A2E4-491C-B278-667E0DF32F73}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C221954-A2E4-491C-B278-667E0DF32F73}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C221954-A2E4-491C-B278-667E0DF32F73}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F01CDE0A-AB31-4789-B732-E69B39A40E7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F01CDE0A-AB31-4789-B732-E69B39A40E7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F01CDE0A-AB31-4789-B732-E69B39A40E7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F01CDE0A-AB31-4789-B732-E69B39A40E7B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6B7E6E87-B18B-46DC-B477-BD566C3F0FF4} = {36DFBE33-AD59-40EF-963F-34C9F07FB252}
+		{59DAF660-6EF7-4945-A592-44E5141D82C8} = {36DFBE33-AD59-40EF-963F-34C9F07FB252}
+		{6922A8AF-A17F-4A9F-A9C4-3E467E23D818} = {36DFBE33-AD59-40EF-963F-34C9F07FB252}
+		{7AAE865F-E62B-4DA9-8D7D-29C752FAA697} = {CA294440-FE4E-49F1-A1EF-C16891756DA5}
+		{4C221954-A2E4-491C-B278-667E0DF32F73} = {B621C787-FD54-4673-8D03-C3A5F0220A72}
+		{F01CDE0A-AB31-4789-B732-E69B39A40E7B} = {B621C787-FD54-4673-8D03-C3A5F0220A72}
+	EndGlobalSection
+EndGlobal
