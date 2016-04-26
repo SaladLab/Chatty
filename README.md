@@ -28,6 +28,6 @@ Reference chatting application for using Akka.Interfaced and Akka.Interfaced.Sli
 
 ## Known issues
 
-#### Client cannot connect to GameServer sometimes
+#### Client cannot connect to Server sometimes
 
 Please retry to connect. It's caused by SlimSocket and will be fixed.
