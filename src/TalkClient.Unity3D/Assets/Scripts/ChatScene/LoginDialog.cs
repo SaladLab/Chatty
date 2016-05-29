@@ -18,15 +18,12 @@ public class LoginDialog : UiDialog
     public InputField PasswordInput;
     public Text MessageText;
 
-    private PacketSerializer _packetSerializer;
     private bool _isLoginBusy;
+    private IUserEventObserver _userEventObserver;
 
-    public void Start()
+    public override void OnShow(object param)
     {
-        _packetSerializer = new PacketSerializer(
-            new PacketSerializerBase.Data(
-                new ProtoBufMessageSerializer(new DomainProtobufSerializer()),
-                new TypeAliasTable()));
+        _userEventObserver = (IUserEventObserver)param;
 
         var loginServer = PlayerPrefs.GetString("LoginServer", "127.0.0.1:9001");
         var loginId = PlayerPrefs.GetString("LoginId", "test");
@@ -69,16 +66,14 @@ public class LoginDialog : UiDialog
                 yield break;
             }
 
-            G.Comm = new Communicator(G.Logger, serverEndPoint,
-                _ => new TcpConnection(_packetSerializer, LogManager.GetLogger("Connection")));
+            G.Comm = CommunicatorHelper.CreateCommunicator<DomainProtobufSerializer>(G.Logger, serverEndPoint);
             G.Comm.Start();
 
             // Try Login
 
-            var userLogin = new UserLoginRef(new SlimActorRef(1), G.SlimRequestWaiter, null);
-
-            var observerId = G.Comm.IssueObserverId();
-            var t1 = userLogin.Login(id, password, observerId);
+            var userLogin = G.Comm.CreateRef<UserLoginRef>();
+            var observer = G.Comm.CreateObserver<IUserEventObserver>(_userEventObserver);
+            var t1 = userLogin.Login(id, password, observer);
             yield return t1.WaitHandle;
             if (t1.Exception != null)
             {
@@ -94,9 +89,9 @@ public class LoginDialog : UiDialog
                 yield break;
             }
 
-            G.User = new UserRef(new SlimActorRef(t1.Result), G.SlimRequestWaiter, null);
+            G.User = (UserRef)t1.Result;
             G.UserId = id;
-            Hide(Tuple.Create(id, observerId));
+            Hide(id);
         }
         finally
         {

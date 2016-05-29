@@ -17,7 +17,7 @@ namespace TalkServer
         }
     }
 
-    public class ChatBotCommanderActor : InterfacedActor<ChatBotCommanderActor>
+    public class ChatBotCommanderActor : InterfacedActor
     {
         private ILog _logger = LogManager.GetLogger("ChatBotCommander");
         private ClusterNodeContext _clusterContext;

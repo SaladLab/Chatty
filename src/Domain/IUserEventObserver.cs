@@ -1,5 +1,4 @@
-﻿using System;
-using Akka.Interfaced;
+﻿using Akka.Interfaced;
 
 namespace Domain
 {

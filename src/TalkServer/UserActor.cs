@@ -6,14 +6,13 @@ using Akka.Actor;
 using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Akka.Interfaced.LogFilter;
-using Akka.Interfaced.SlimSocket.Server;
 using Common.Logging;
 using Domain;
 
 namespace TalkServer
 {
     [Log]
-    public class UserActor : InterfacedActor<UserActor>, IUser, IUserMessasing
+    public class UserActor : InterfacedActor, IUser, IUserMessasing
     {
         private ILog _logger;
         private ClusterNodeContext _clusterContext;
@@ -22,13 +21,13 @@ namespace TalkServer
         private UserEventObserver _eventObserver;
         private Dictionary<string, RoomRef> _enteredRoomMap;
 
-        public UserActor(ClusterNodeContext clusterContext, IActorRef clientSession, string id, int observerId)
+        public UserActor(ClusterNodeContext clusterContext, IActorRef clientSession, string id, IUserEventObserver observer)
         {
             _logger = LogManager.GetLogger($"UserActor({id})");
             _clusterContext = clusterContext;
             _clientSession = clientSession;
             _id = id;
-            _eventObserver = new UserEventObserver(_clientSession, observerId);
+            _eventObserver = (UserEventObserver)observer;
             _enteredRoomMap = new Dictionary<string, RoomRef>();
         }
 
@@ -58,7 +57,7 @@ namespace TalkServer
             return reply.Ids?.Select(x => (string)x).ToList();
         }
 
-        async Task<Tuple<int, RoomInfo>> IUser.EnterRoom(string name, int observerId)
+        async Task<Tuple<IOccupant, RoomInfo>> IUser.EnterRoom(string name, IRoomObserver observer)
         {
             if (_enteredRoomMap.ContainsKey(name))
                 throw new ResultException(ResultCodeType.NeedToBeOutOfRoom);
@@ -74,7 +73,6 @@ namespace TalkServer
 
             // Let's enter the room !
 
-            var observer = new RoomObserver(_clientSession, observerId);
             var info = await room.Enter(_id, observer);
 
             // Bind an occupant actor with client session
@@ -83,7 +81,7 @@ namespace TalkServer
                 new ActorBoundSessionMessage.Bind(room.Actor, typeof(IOccupant), _id));
 
             _enteredRoomMap[name] = room;
-            return Tuple.Create(reply2.ActorId, info);
+            return Tuple.Create((IOccupant)BoundActorRef.Create<OccupantRef>(reply2.ActorId), info);
         }
 
         async Task IUser.ExitFromRoom(string name)

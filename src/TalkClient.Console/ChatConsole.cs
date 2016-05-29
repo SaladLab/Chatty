@@ -11,7 +11,6 @@ namespace TalkClient.Console
     internal class ChatConsole : IUserEventObserver
     {
         private Communicator _communicator;
-        private SlimTaskRequestWaiter _requestWaiter;
         private UserRef _user;
         private Dictionary<string, OccupantRef> _occupantMap = new Dictionary<string, OccupantRef>();
         private string _currentRoomName;
@@ -19,7 +18,6 @@ namespace TalkClient.Console
         public async Task RunAsync(Communicator communicator)
         {
             _communicator = communicator;
-            _requestWaiter = new SlimTaskRequestWaiter(communicator);
 
             _user = await LoginAsync();
             await EnterRoomAsync("#general");
@@ -28,19 +26,16 @@ namespace TalkClient.Console
 
         private async Task<UserRef> LoginAsync()
         {
-            var userLogin = new UserLoginRef(new SlimActorRef(1), _requestWaiter, null);
-
-            var observerId = _communicator.IssueObserverId();
-            _communicator.AddObserver(observerId, new ObserverEventDispatcher(this));
+            var userLogin = _communicator.CreateRef<UserLoginRef>();
+            var observer = _communicator.CreateObserver<IUserEventObserver>(this);
 
             try
             {
-                var userActorId = await userLogin.Login("console", "1234", observerId);
-                return new UserRef(new SlimActorRef(userActorId), _requestWaiter, null);
+                return (UserRef)(await userLogin.Login("console", "1234", observer));
             }
             catch (Exception)
             {
-                _communicator.RemoveObserver(observerId);
+                observer.Dispose();
                 throw;
             }
         }
@@ -188,19 +183,17 @@ namespace TalkClient.Console
 
         private async Task<RoomInfo> EnterRoomAsync(string name)
         {
-            var observerId = _communicator.IssueObserverId();
-            _communicator.AddObserver(observerId, new ObserverEventDispatcher(new RoomConsole(name)));
+            var observer = _communicator.CreateObserver<IRoomObserver>(new RoomConsole(name));
             try
             {
-                var ret = await _user.EnterRoom(name, observerId);
-                var occupant = new OccupantRef(new SlimActorRef(ret.Item1), _requestWaiter, null);
-                _occupantMap.Add(name, occupant);
+                var ret = await _user.EnterRoom(name, observer);
+                _occupantMap.Add(name, (OccupantRef)ret.Item1);
                 _currentRoomName = name;
                 return ret.Item2;
             }
             catch (Exception)
             {
-                _communicator.RemoveObserver(observerId);
+                observer.Dispose();
                 throw;
             }
         }

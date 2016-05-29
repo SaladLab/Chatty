@@ -13,7 +13,7 @@ using Domain;
 namespace TalkServer
 {
     [Log]
-    public class RoomActor : InterfacedActor<RoomActor>, IRoom, IOccupant
+    public class RoomActor : InterfacedActor, IRoom, IOccupant
     {
         private class UserData
         {
@@ -46,12 +46,12 @@ namespace TalkServer
             }
         }
 
-        protected override async Task OnPreStart()
+        protected override async Task OnStart(bool restarted)
         {
             await LoadAsync();
         }
 
-        protected override async Task OnPreStop()
+        protected override async Task OnGracefulStop()
         {
             await SaveAsync();
         }

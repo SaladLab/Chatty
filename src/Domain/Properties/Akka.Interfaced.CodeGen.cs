@@ -19,7 +19,7 @@ using System.ComponentModel;
 
 namespace Domain
 {
-    [PayloadTableForInterfacedActor(typeof(IOccupant))]
+    [PayloadTable(typeof(IOccupant), PayloadTableKind.Request)]
     public static class IOccupant_PayloadTable
     {
         public static Type[,] GetPayloadTypes()
@@ -33,14 +33,21 @@ namespace Domain
 
         [ProtoContract, TypeAlias]
         public class GetHistory_Invoke
-            : IInterfacedPayload, ITagOverridable, IAsyncInvokable
+            : IInterfacedPayload, IAsyncInvokable, IPayloadTagOverridable
         {
-            public Type GetInterfaceType() { return typeof(IOccupant); }
-            public void SetTag(object value) { }
-            public async Task<IValueGetable> InvokeAsync(object target)
+            public Type GetInterfaceType()
             {
-                var __v = await ((IOccupant)target).GetHistory();
-                return (IValueGetable)(new GetHistory_Return { v = (System.Collections.Generic.List<Domain.ChatItem>)__v });
+                return typeof(IOccupant);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                var __v = await ((IOccupant)__target).GetHistory();
+                return (IValueGetable)(new GetHistory_Return { v = __v });
+            }
+
+            void IPayloadTagOverridable.SetTag(object value)
+            {
             }
         }
 
@@ -49,37 +56,63 @@ namespace Domain
             : IInterfacedPayload, IValueGetable
         {
             [ProtoMember(1)] public System.Collections.Generic.List<Domain.ChatItem> v;
-            public Type GetInterfaceType() { return typeof(IOccupant); }
-            public object Value { get { return v; } }
+
+            public Type GetInterfaceType()
+            {
+                return typeof(IOccupant);
+            }
+
+            public object Value
+            {
+                get { return v; }
+            }
         }
 
         [ProtoContract, TypeAlias]
         public class Invite_Invoke
-            : IInterfacedPayload, ITagOverridable, IAsyncInvokable
+            : IInterfacedPayload, IAsyncInvokable, IPayloadTagOverridable
         {
             [ProtoMember(1)] public System.String targetUserId;
             [ProtoMember(2)] public System.String senderUserId;
-            public Type GetInterfaceType() { return typeof(IOccupant); }
-            public void SetTag(object value) { senderUserId = (System.String)value; }
-            public async Task<IValueGetable> InvokeAsync(object target)
+
+            public Type GetInterfaceType()
             {
-                await ((IOccupant)target).Invite(targetUserId, senderUserId);
+                return typeof(IOccupant);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                await ((IOccupant)__target).Invite(targetUserId, senderUserId);
                 return null;
+            }
+
+            void IPayloadTagOverridable.SetTag(object value)
+            {
+                senderUserId = (System.String)value;
             }
         }
 
         [ProtoContract, TypeAlias]
         public class Say_Invoke
-            : IInterfacedPayload, ITagOverridable, IAsyncInvokable
+            : IInterfacedPayload, IAsyncInvokable, IPayloadTagOverridable
         {
             [ProtoMember(1)] public System.String msg;
             [ProtoMember(2)] public System.String senderUserId;
-            public Type GetInterfaceType() { return typeof(IOccupant); }
-            public void SetTag(object value) { senderUserId = (System.String)value; }
-            public async Task<IValueGetable> InvokeAsync(object target)
+
+            public Type GetInterfaceType()
             {
-                await ((IOccupant)target).Say(msg, senderUserId);
+                return typeof(IOccupant);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                await ((IOccupant)__target).Say(msg, senderUserId);
                 return null;
+            }
+
+            void IPayloadTagOverridable.SetTag(object value)
+            {
+                senderUserId = (System.String)value;
             }
         }
     }
@@ -91,16 +124,9 @@ namespace Domain
         void Say(System.String msg, System.String senderUserId = null);
     }
 
-    [ProtoContract, TypeAlias]
     public class OccupantRef : InterfacedActorRef, IOccupant, IOccupant_NoReply
     {
-        [ProtoMember(1)] private ActorRefBase _actor
-        {
-            get { return (ActorRefBase)Actor; }
-            set { Actor = value; }
-        }
-
-        private OccupantRef() : base(null)
+        public OccupantRef() : base(null)
         {
         }
 
@@ -175,6 +201,26 @@ namespace Domain
             SendRequest(requestMessage);
         }
     }
+
+    [ProtoContract]
+    public class SurrogateForIOccupant
+    {
+        [ProtoMember(1)] public IActorRef Actor;
+
+        [ProtoConverter]
+        public static SurrogateForIOccupant Convert(IOccupant value)
+        {
+            if (value == null) return null;
+            return new SurrogateForIOccupant { Actor = ((OccupantRef)value).Actor };
+        }
+
+        [ProtoConverter]
+        public static IOccupant Convert(SurrogateForIOccupant value)
+        {
+            if (value == null) return null;
+            return new OccupantRef(value.Actor);
+        }
+    }
 }
 
 #endregion
@@ -182,7 +228,7 @@ namespace Domain
 
 namespace Domain
 {
-    [PayloadTableForInterfacedActor(typeof(IRoom))]
+    [PayloadTable(typeof(IRoom), PayloadTableKind.Request)]
     public static class IRoom_PayloadTable
     {
         public static Type[,] GetPayloadTypes()
@@ -195,15 +241,28 @@ namespace Domain
 
         [ProtoContract, TypeAlias]
         public class Enter_Invoke
-            : IInterfacedPayload, IAsyncInvokable
+            : IInterfacedPayload, IAsyncInvokable, IPayloadObserverUpdatable
         {
             [ProtoMember(1)] public System.String userId;
-            [ProtoMember(2)] public Domain.RoomObserver observer;
-            public Type GetInterfaceType() { return typeof(IRoom); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+            [ProtoMember(2)] public Domain.IRoomObserver observer;
+
+            public Type GetInterfaceType()
             {
-                var __v = await ((IRoom)target).Enter(userId, observer);
+                return typeof(IRoom);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                var __v = await ((IRoom)__target).Enter(userId, observer);
                 return (IValueGetable)(new Enter_Return { v = __v });
+            }
+
+            void IPayloadObserverUpdatable.Update(Action<IInterfacedObserver> updater)
+            {
+                if (observer != null)
+                {
+                    updater(observer);
+                }
             }
         }
 
@@ -212,8 +271,16 @@ namespace Domain
             : IInterfacedPayload, IValueGetable
         {
             [ProtoMember(1)] public Domain.RoomInfo v;
-            public Type GetInterfaceType() { return typeof(IRoom); }
-            public object Value { get { return v; } }
+
+            public Type GetInterfaceType()
+            {
+                return typeof(IRoom);
+            }
+
+            public object Value
+            {
+                get { return v; }
+            }
         }
 
         [ProtoContract, TypeAlias]
@@ -221,10 +288,15 @@ namespace Domain
             : IInterfacedPayload, IAsyncInvokable
         {
             [ProtoMember(1)] public System.String userId;
-            public Type GetInterfaceType() { return typeof(IRoom); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+
+            public Type GetInterfaceType()
             {
-                await ((IRoom)target).Exit(userId);
+                return typeof(IRoom);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                await ((IRoom)__target).Exit(userId);
                 return null;
             }
         }
@@ -236,16 +308,9 @@ namespace Domain
         void Exit(System.String userId);
     }
 
-    [ProtoContract, TypeAlias]
     public class RoomRef : InterfacedActorRef, IRoom, IRoom_NoReply
     {
-        [ProtoMember(1)] private ActorRefBase _actor
-        {
-            get { return (ActorRefBase)Actor; }
-            set { Actor = value; }
-        }
-
-        private RoomRef() : base(null)
+        public RoomRef() : base(null)
         {
         }
 
@@ -275,7 +340,7 @@ namespace Domain
         public Task<Domain.RoomInfo> Enter(System.String userId, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IRoom_PayloadTable.Enter_Invoke { userId = userId, observer = (Domain.RoomObserver)observer }
+                InvokePayload = new IRoom_PayloadTable.Enter_Invoke { userId = userId, observer = observer }
             };
             return SendRequestAndReceive<Domain.RoomInfo>(requestMessage);
         }
@@ -291,7 +356,7 @@ namespace Domain
         void IRoom_NoReply.Enter(System.String userId, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IRoom_PayloadTable.Enter_Invoke { userId = userId, observer = (Domain.RoomObserver)observer }
+                InvokePayload = new IRoom_PayloadTable.Enter_Invoke { userId = userId, observer = observer }
             };
             SendRequest(requestMessage);
         }
@@ -304,6 +369,26 @@ namespace Domain
             SendRequest(requestMessage);
         }
     }
+
+    [ProtoContract]
+    public class SurrogateForIRoom
+    {
+        [ProtoMember(1)] public IActorRef Actor;
+
+        [ProtoConverter]
+        public static SurrogateForIRoom Convert(IRoom value)
+        {
+            if (value == null) return null;
+            return new SurrogateForIRoom { Actor = ((RoomRef)value).Actor };
+        }
+
+        [ProtoConverter]
+        public static IRoom Convert(SurrogateForIRoom value)
+        {
+            if (value == null) return null;
+            return new RoomRef(value.Actor);
+        }
+    }
 }
 
 #endregion
@@ -311,7 +396,7 @@ namespace Domain
 
 namespace Domain
 {
-    [PayloadTableForInterfacedActor(typeof(IUser))]
+    [PayloadTable(typeof(IUser), PayloadTableKind.Request)]
     public static class IUser_PayloadTable
     {
         public static Type[,] GetPayloadTypes()
@@ -327,25 +412,54 @@ namespace Domain
 
         [ProtoContract, TypeAlias]
         public class EnterRoom_Invoke
-            : IInterfacedPayload, IAsyncInvokable
+            : IInterfacedPayload, IAsyncInvokable, IPayloadObserverUpdatable
         {
             [ProtoMember(1)] public System.String name;
-            [ProtoMember(2)] public System.Int32 observerId;
-            public Type GetInterfaceType() { return typeof(IUser); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+            [ProtoMember(2)] public Domain.IRoomObserver observer;
+
+            public Type GetInterfaceType()
             {
-                var __v = await ((IUser)target).EnterRoom(name, observerId);
-                return (IValueGetable)(new EnterRoom_Return { v = (System.Tuple<System.Int32, Domain.RoomInfo>)__v });
+                return typeof(IUser);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                var __v = await ((IUser)__target).EnterRoom(name, observer);
+                return (IValueGetable)(new EnterRoom_Return { v = __v });
+            }
+
+            void IPayloadObserverUpdatable.Update(Action<IInterfacedObserver> updater)
+            {
+                if (observer != null)
+                {
+                    updater(observer);
+                }
             }
         }
 
         [ProtoContract, TypeAlias]
         public class EnterRoom_Return
-            : IInterfacedPayload, IValueGetable
+            : IInterfacedPayload, IValueGetable, IPayloadActorRefUpdatable
         {
-            [ProtoMember(1)] public System.Tuple<System.Int32, Domain.RoomInfo> v;
-            public Type GetInterfaceType() { return typeof(IUser); }
-            public object Value { get { return v; } }
+            [ProtoMember(1)] public System.Tuple<Domain.IOccupant, Domain.RoomInfo> v;
+
+            public Type GetInterfaceType()
+            {
+                return typeof(IUser);
+            }
+
+            public object Value
+            {
+                get { return v; }
+            }
+
+            void IPayloadActorRefUpdatable.Update(Action<object> updater)
+            {
+                if (v != null)
+                {
+                    if (v.Item1 != null) updater(v.Item1);
+                }
+            }
         }
 
         [ProtoContract, TypeAlias]
@@ -353,10 +467,15 @@ namespace Domain
             : IInterfacedPayload, IAsyncInvokable
         {
             [ProtoMember(1)] public System.String name;
-            public Type GetInterfaceType() { return typeof(IUser); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+
+            public Type GetInterfaceType()
             {
-                await ((IUser)target).ExitFromRoom(name);
+                return typeof(IUser);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                await ((IUser)__target).ExitFromRoom(name);
                 return null;
             }
         }
@@ -365,10 +484,14 @@ namespace Domain
         public class GetId_Invoke
             : IInterfacedPayload, IAsyncInvokable
         {
-            public Type GetInterfaceType() { return typeof(IUser); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+            public Type GetInterfaceType()
             {
-                var __v = await ((IUser)target).GetId();
+                return typeof(IUser);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                var __v = await ((IUser)__target).GetId();
                 return (IValueGetable)(new GetId_Return { v = __v });
             }
         }
@@ -378,19 +501,31 @@ namespace Domain
             : IInterfacedPayload, IValueGetable
         {
             [ProtoMember(1)] public System.String v;
-            public Type GetInterfaceType() { return typeof(IUser); }
-            public object Value { get { return v; } }
+
+            public Type GetInterfaceType()
+            {
+                return typeof(IUser);
+            }
+
+            public object Value
+            {
+                get { return v; }
+            }
         }
 
         [ProtoContract, TypeAlias]
         public class GetRoomList_Invoke
             : IInterfacedPayload, IAsyncInvokable
         {
-            public Type GetInterfaceType() { return typeof(IUser); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+            public Type GetInterfaceType()
             {
-                var __v = await ((IUser)target).GetRoomList();
-                return (IValueGetable)(new GetRoomList_Return { v = (System.Collections.Generic.List<System.String>)__v });
+                return typeof(IUser);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                var __v = await ((IUser)__target).GetRoomList();
+                return (IValueGetable)(new GetRoomList_Return { v = __v });
             }
         }
 
@@ -399,8 +534,16 @@ namespace Domain
             : IInterfacedPayload, IValueGetable
         {
             [ProtoMember(1)] public System.Collections.Generic.List<System.String> v;
-            public Type GetInterfaceType() { return typeof(IUser); }
-            public object Value { get { return v; } }
+
+            public Type GetInterfaceType()
+            {
+                return typeof(IUser);
+            }
+
+            public object Value
+            {
+                get { return v; }
+            }
         }
 
         [ProtoContract, TypeAlias]
@@ -409,10 +552,15 @@ namespace Domain
         {
             [ProtoMember(1)] public System.String targetUserId;
             [ProtoMember(2)] public System.String message;
-            public Type GetInterfaceType() { return typeof(IUser); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+
+            public Type GetInterfaceType()
             {
-                await ((IUser)target).Whisper(targetUserId, message);
+                return typeof(IUser);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                await ((IUser)__target).Whisper(targetUserId, message);
                 return null;
             }
         }
@@ -420,23 +568,16 @@ namespace Domain
 
     public interface IUser_NoReply
     {
-        void EnterRoom(System.String name, System.Int32 observerId);
+        void EnterRoom(System.String name, Domain.IRoomObserver observer);
         void ExitFromRoom(System.String name);
         void GetId();
         void GetRoomList();
         void Whisper(System.String targetUserId, System.String message);
     }
 
-    [ProtoContract, TypeAlias]
     public class UserRef : InterfacedActorRef, IUser, IUser_NoReply
     {
-        [ProtoMember(1)] private ActorRefBase _actor
-        {
-            get { return (ActorRefBase)Actor; }
-            set { Actor = value; }
-        }
-
-        private UserRef() : base(null)
+        public UserRef() : base(null)
         {
         }
 
@@ -463,12 +604,12 @@ namespace Domain
             return new UserRef(Actor, RequestWaiter, timeout);
         }
 
-        public Task<System.Tuple<System.Int32, Domain.RoomInfo>> EnterRoom(System.String name, System.Int32 observerId)
+        public Task<System.Tuple<Domain.IOccupant, Domain.RoomInfo>> EnterRoom(System.String name, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observerId = observerId }
+                InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observer = observer }
             };
-            return SendRequestAndReceive<System.Tuple<System.Int32, Domain.RoomInfo>>(requestMessage);
+            return SendRequestAndReceive<System.Tuple<Domain.IOccupant, Domain.RoomInfo>>(requestMessage);
         }
 
         public Task ExitFromRoom(System.String name)
@@ -503,10 +644,10 @@ namespace Domain
             return SendRequestAndWait(requestMessage);
         }
 
-        void IUser_NoReply.EnterRoom(System.String name, System.Int32 observerId)
+        void IUser_NoReply.EnterRoom(System.String name, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observerId = observerId }
+                InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observer = observer }
             };
             SendRequest(requestMessage);
         }
@@ -543,6 +684,26 @@ namespace Domain
             SendRequest(requestMessage);
         }
     }
+
+    [ProtoContract]
+    public class SurrogateForIUser
+    {
+        [ProtoMember(1)] public IActorRef Actor;
+
+        [ProtoConverter]
+        public static SurrogateForIUser Convert(IUser value)
+        {
+            if (value == null) return null;
+            return new SurrogateForIUser { Actor = ((UserRef)value).Actor };
+        }
+
+        [ProtoConverter]
+        public static IUser Convert(SurrogateForIUser value)
+        {
+            if (value == null) return null;
+            return new UserRef(value.Actor);
+        }
+    }
 }
 
 #endregion
@@ -550,7 +711,7 @@ namespace Domain
 
 namespace Domain
 {
-    [PayloadTableForInterfacedActor(typeof(IUserLogin))]
+    [PayloadTable(typeof(IUserLogin), PayloadTableKind.Request)]
     public static class IUserLogin_PayloadTable
     {
         public static Type[,] GetPayloadTypes()
@@ -562,44 +723,66 @@ namespace Domain
 
         [ProtoContract, TypeAlias]
         public class Login_Invoke
-            : IInterfacedPayload, IAsyncInvokable
+            : IInterfacedPayload, IAsyncInvokable, IPayloadObserverUpdatable
         {
             [ProtoMember(1)] public System.String id;
             [ProtoMember(2)] public System.String password;
-            [ProtoMember(3)] public System.Int32 observerId;
-            public Type GetInterfaceType() { return typeof(IUserLogin); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+            [ProtoMember(3)] public Domain.IUserEventObserver observer;
+
+            public Type GetInterfaceType()
             {
-                var __v = await ((IUserLogin)target).Login(id, password, observerId);
+                return typeof(IUserLogin);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                var __v = await ((IUserLogin)__target).Login(id, password, observer);
                 return (IValueGetable)(new Login_Return { v = __v });
+            }
+
+            void IPayloadObserverUpdatable.Update(Action<IInterfacedObserver> updater)
+            {
+                if (observer != null)
+                {
+                    updater(observer);
+                }
             }
         }
 
         [ProtoContract, TypeAlias]
         public class Login_Return
-            : IInterfacedPayload, IValueGetable
+            : IInterfacedPayload, IValueGetable, IPayloadActorRefUpdatable
         {
-            [ProtoMember(1)] public System.Int32 v;
-            public Type GetInterfaceType() { return typeof(IUserLogin); }
-            public object Value { get { return v; } }
+            [ProtoMember(1)] public Domain.IUser v;
+
+            public Type GetInterfaceType()
+            {
+                return typeof(IUserLogin);
+            }
+
+            public object Value
+            {
+                get { return v; }
+            }
+
+            void IPayloadActorRefUpdatable.Update(Action<object> updater)
+            {
+                if (v != null)
+                {
+                    updater(v); 
+                }
+            }
         }
     }
 
     public interface IUserLogin_NoReply
     {
-        void Login(System.String id, System.String password, System.Int32 observerId);
+        void Login(System.String id, System.String password, Domain.IUserEventObserver observer);
     }
 
-    [ProtoContract, TypeAlias]
     public class UserLoginRef : InterfacedActorRef, IUserLogin, IUserLogin_NoReply
     {
-        [ProtoMember(1)] private ActorRefBase _actor
-        {
-            get { return (ActorRefBase)Actor; }
-            set { Actor = value; }
-        }
-
-        private UserLoginRef() : base(null)
+        public UserLoginRef() : base(null)
         {
         }
 
@@ -626,20 +809,40 @@ namespace Domain
             return new UserLoginRef(Actor, RequestWaiter, timeout);
         }
 
-        public Task<System.Int32> Login(System.String id, System.String password, System.Int32 observerId)
+        public Task<Domain.IUser> Login(System.String id, System.String password, Domain.IUserEventObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observerId = observerId }
+                InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observer = observer }
             };
-            return SendRequestAndReceive<System.Int32>(requestMessage);
+            return SendRequestAndReceive<Domain.IUser>(requestMessage);
         }
 
-        void IUserLogin_NoReply.Login(System.String id, System.String password, System.Int32 observerId)
+        void IUserLogin_NoReply.Login(System.String id, System.String password, Domain.IUserEventObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observerId = observerId }
+                InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observer = observer }
             };
             SendRequest(requestMessage);
+        }
+    }
+
+    [ProtoContract]
+    public class SurrogateForIUserLogin
+    {
+        [ProtoMember(1)] public IActorRef Actor;
+
+        [ProtoConverter]
+        public static SurrogateForIUserLogin Convert(IUserLogin value)
+        {
+            if (value == null) return null;
+            return new SurrogateForIUserLogin { Actor = ((UserLoginRef)value).Actor };
+        }
+
+        [ProtoConverter]
+        public static IUserLogin Convert(SurrogateForIUserLogin value)
+        {
+            if (value == null) return null;
+            return new UserLoginRef(value.Actor);
         }
     }
 }
@@ -649,7 +852,7 @@ namespace Domain
 
 namespace Domain
 {
-    [PayloadTableForInterfacedActor(typeof(IUserMessasing))]
+    [PayloadTable(typeof(IUserMessasing), PayloadTableKind.Request)]
     public static class IUserMessasing_PayloadTable
     {
         public static Type[,] GetPayloadTypes()
@@ -666,10 +869,15 @@ namespace Domain
         {
             [ProtoMember(1)] public System.String invitorUserId;
             [ProtoMember(2)] public System.String roomName;
-            public Type GetInterfaceType() { return typeof(IUserMessasing); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+
+            public Type GetInterfaceType()
             {
-                await ((IUserMessasing)target).Invite(invitorUserId, roomName);
+                return typeof(IUserMessasing);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                await ((IUserMessasing)__target).Invite(invitorUserId, roomName);
                 return null;
             }
         }
@@ -679,10 +887,15 @@ namespace Domain
             : IInterfacedPayload, IAsyncInvokable
         {
             [ProtoMember(1)] public Domain.ChatItem chatItem;
-            public Type GetInterfaceType() { return typeof(IUserMessasing); }
-            public async Task<IValueGetable> InvokeAsync(object target)
+
+            public Type GetInterfaceType()
             {
-                await ((IUserMessasing)target).Whisper(chatItem);
+                return typeof(IUserMessasing);
+            }
+
+            public async Task<IValueGetable> InvokeAsync(object __target)
+            {
+                await ((IUserMessasing)__target).Whisper(chatItem);
                 return null;
             }
         }
@@ -694,16 +907,9 @@ namespace Domain
         void Whisper(Domain.ChatItem chatItem);
     }
 
-    [ProtoContract, TypeAlias]
     public class UserMessasingRef : InterfacedActorRef, IUserMessasing, IUserMessasing_NoReply
     {
-        [ProtoMember(1)] private ActorRefBase _actor
-        {
-            get { return (ActorRefBase)Actor; }
-            set { Actor = value; }
-        }
-
-        private UserMessasingRef() : base(null)
+        public UserMessasingRef() : base(null)
         {
         }
 
@@ -762,6 +968,26 @@ namespace Domain
             SendRequest(requestMessage);
         }
     }
+
+    [ProtoContract]
+    public class SurrogateForIUserMessasing
+    {
+        [ProtoMember(1)] public IActorRef Actor;
+
+        [ProtoConverter]
+        public static SurrogateForIUserMessasing Convert(IUserMessasing value)
+        {
+            if (value == null) return null;
+            return new SurrogateForIUserMessasing { Actor = ((UserMessasingRef)value).Actor };
+        }
+
+        [ProtoConverter]
+        public static IUserMessasing Convert(SurrogateForIUserMessasing value)
+        {
+            if (value == null) return null;
+            return new UserMessasingRef(value.Actor);
+        }
+    }
 }
 
 #endregion
@@ -769,65 +995,81 @@ namespace Domain
 
 namespace Domain
 {
+    [PayloadTable(typeof(IRoomObserver), PayloadTableKind.Notification)]
     public static class IRoomObserver_PayloadTable
     {
+        public static Type[] GetPayloadTypes()
+        {
+            return new Type[] {
+                typeof(Enter_Invoke),
+                typeof(Exit_Invoke),
+                typeof(Say_Invoke),
+            };
+        }
+
         [ProtoContract, TypeAlias]
-        public class Enter_Invoke : IInvokable
+        public class Enter_Invoke : IInterfacedPayload, IInvokable
         {
             [ProtoMember(1)] public System.String userId;
-            public void Invoke(object target)
+
+            public Type GetInterfaceType()
             {
-                ((IRoomObserver)target).Enter(userId);
+                return typeof(IRoomObserver);
+            }
+
+            public void Invoke(object __target)
+            {
+                ((IRoomObserver)__target).Enter(userId);
             }
         }
 
         [ProtoContract, TypeAlias]
-        public class Exit_Invoke : IInvokable
+        public class Exit_Invoke : IInterfacedPayload, IInvokable
         {
             [ProtoMember(1)] public System.String userId;
-            public void Invoke(object target)
+
+            public Type GetInterfaceType()
             {
-                ((IRoomObserver)target).Exit(userId);
+                return typeof(IRoomObserver);
+            }
+
+            public void Invoke(object __target)
+            {
+                ((IRoomObserver)__target).Exit(userId);
             }
         }
 
         [ProtoContract, TypeAlias]
-        public class Say_Invoke : IInvokable
+        public class Say_Invoke : IInterfacedPayload, IInvokable
         {
             [ProtoMember(1)] public Domain.ChatItem chatItem;
-            public void Invoke(object target)
+
+            public Type GetInterfaceType()
             {
-                ((IRoomObserver)target).Say(chatItem);
+                return typeof(IRoomObserver);
+            }
+
+            public void Invoke(object __target)
+            {
+                ((IRoomObserver)__target).Say(chatItem);
             }
         }
     }
 
-    [ProtoContract, TypeAlias]
     public class RoomObserver : InterfacedObserver, IRoomObserver
     {
-        [ProtoMember(1)] private ActorRefBase _actor
-        {
-            get { return Channel != null ? (ActorRefBase)(((ActorNotificationChannel)Channel).Actor) : null; }
-            set { Channel = new ActorNotificationChannel(value); }
-        }
-
-        [ProtoMember(2)] private int _observerId
-        {
-            get { return ObserverId; }
-            set { ObserverId = value; }
-        }
-
-        private RoomObserver() : base(null, 0)
+        public RoomObserver()
+            : base(null, 0)
         {
         }
 
-        public RoomObserver(IActorRef target, int observerId)
-            : base(new ActorNotificationChannel(target), observerId)
-        {
-        }
-
-        public RoomObserver(INotificationChannel channel, int observerId)
+        public RoomObserver(INotificationChannel channel, int observerId = 0)
             : base(channel, observerId)
+        {
+        }
+
+        public RoomObserver(IActorRef target, int observerId = 0)
+            : base(new ActorNotificationChannel(target), observerId)
         {
         }
 
@@ -849,6 +1091,28 @@ namespace Domain
             Notify(payload);
         }
     }
+
+    [ProtoContract]
+    public class SurrogateForIRoomObserver
+    {
+        [ProtoMember(1)] public INotificationChannel Channel;
+        [ProtoMember(2)] public int ObserverId;
+
+        [ProtoConverter]
+        public static SurrogateForIRoomObserver Convert(IRoomObserver value)
+        {
+            if (value == null) return null;
+            var o = (RoomObserver)value;
+            return new SurrogateForIRoomObserver { Channel = o.Channel, ObserverId = o.ObserverId };
+        }
+
+        [ProtoConverter]
+        public static IRoomObserver Convert(SurrogateForIRoomObserver value)
+        {
+            if (value == null) return null;
+            return new RoomObserver(value.Channel, value.ObserverId);
+        }
+    }
 }
 
 #endregion
@@ -856,56 +1120,65 @@ namespace Domain
 
 namespace Domain
 {
+    [PayloadTable(typeof(IUserEventObserver), PayloadTableKind.Notification)]
     public static class IUserEventObserver_PayloadTable
     {
+        public static Type[] GetPayloadTypes()
+        {
+            return new Type[] {
+                typeof(Whisper_Invoke),
+                typeof(Invite_Invoke),
+            };
+        }
+
         [ProtoContract, TypeAlias]
-        public class Whisper_Invoke : IInvokable
+        public class Whisper_Invoke : IInterfacedPayload, IInvokable
         {
             [ProtoMember(1)] public Domain.ChatItem chatItem;
-            public void Invoke(object target)
+
+            public Type GetInterfaceType()
             {
-                ((IUserEventObserver)target).Whisper(chatItem);
+                return typeof(IUserEventObserver);
+            }
+
+            public void Invoke(object __target)
+            {
+                ((IUserEventObserver)__target).Whisper(chatItem);
             }
         }
 
         [ProtoContract, TypeAlias]
-        public class Invite_Invoke : IInvokable
+        public class Invite_Invoke : IInterfacedPayload, IInvokable
         {
             [ProtoMember(1)] public System.String invitorUserId;
             [ProtoMember(2)] public System.String roomName;
-            public void Invoke(object target)
+
+            public Type GetInterfaceType()
             {
-                ((IUserEventObserver)target).Invite(invitorUserId, roomName);
+                return typeof(IUserEventObserver);
+            }
+
+            public void Invoke(object __target)
+            {
+                ((IUserEventObserver)__target).Invite(invitorUserId, roomName);
             }
         }
     }
 
-    [ProtoContract, TypeAlias]
     public class UserEventObserver : InterfacedObserver, IUserEventObserver
     {
-        [ProtoMember(1)] private ActorRefBase _actor
-        {
-            get { return Channel != null ? (ActorRefBase)(((ActorNotificationChannel)Channel).Actor) : null; }
-            set { Channel = new ActorNotificationChannel(value); }
-        }
-
-        [ProtoMember(2)] private int _observerId
-        {
-            get { return ObserverId; }
-            set { ObserverId = value; }
-        }
-
-        private UserEventObserver() : base(null, 0)
+        public UserEventObserver()
+            : base(null, 0)
         {
         }
 
-        public UserEventObserver(IActorRef target, int observerId)
-            : base(new ActorNotificationChannel(target), observerId)
-        {
-        }
-
-        public UserEventObserver(INotificationChannel channel, int observerId)
+        public UserEventObserver(INotificationChannel channel, int observerId = 0)
             : base(channel, observerId)
+        {
+        }
+
+        public UserEventObserver(IActorRef target, int observerId = 0)
+            : base(new ActorNotificationChannel(target), observerId)
         {
         }
 
@@ -919,6 +1192,28 @@ namespace Domain
         {
             var payload = new IUserEventObserver_PayloadTable.Invite_Invoke { invitorUserId = invitorUserId, roomName = roomName };
             Notify(payload);
+        }
+    }
+
+    [ProtoContract]
+    public class SurrogateForIUserEventObserver
+    {
+        [ProtoMember(1)] public INotificationChannel Channel;
+        [ProtoMember(2)] public int ObserverId;
+
+        [ProtoConverter]
+        public static SurrogateForIUserEventObserver Convert(IUserEventObserver value)
+        {
+            if (value == null) return null;
+            var o = (UserEventObserver)value;
+            return new SurrogateForIUserEventObserver { Channel = o.Channel, ObserverId = o.ObserverId };
+        }
+
+        [ProtoConverter]
+        public static IUserEventObserver Convert(SurrogateForIUserEventObserver value)
+        {
+            if (value == null) return null;
+            return new UserEventObserver(value.Channel, value.ObserverId);
         }
     }
 }

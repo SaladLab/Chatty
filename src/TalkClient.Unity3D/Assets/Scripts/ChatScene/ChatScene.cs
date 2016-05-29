@@ -19,13 +19,12 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
     {
         public ChatPanel ChatPanel;
         public OccupantRef Occupant;
-        public int ObserverId;
+        public RoomObserver Observer;
     }
     private Dictionary<string, RoomItem> _roomItemMap = new Dictionary<string, RoomItem>();
 
     private void Start()
     {
-        ApplicationComponent.TryInit();
         UiManager.Initialize();
 
         ControlPanel.LogoutButtonClicked = OnLogoutButtonClick;
@@ -53,16 +52,14 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
     {
         try
         {
-            var loginDialog = UiManager.Instance.ShowModalRoot<LoginDialog>();
+            var loginDialog = UiManager.Instance.ShowModalRoot<LoginDialog>(this);
             yield return StartCoroutine(loginDialog.WaitForHide());
 
             if (loginDialog.ReturnValue != null)
             {
-                var result = (Tuple<string, int>)loginDialog.ReturnValue;
-                ControlPanel.SetUserName(result.Item1);
+                var result = (string)loginDialog.ReturnValue;
+                ControlPanel.SetUserName(result);
 
-                var observer = new ObserverEventDispatcher(this);
-                G.Comm.AddObserver(result.Item2, observer);
                 yield return StartCoroutine(ProcessEnterRoom(G.User, "#general"));
             }
         }
@@ -136,23 +133,28 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
     private IEnumerator ProcessEnterRoom(UserRef user, string roomName)
     {
+        // Spawn new room item
+
+        var go = UiHelper.AddChild(ContentPanel, ChatPanelTemplate);
+        var chatPanel = go.GetComponent<ChatPanel>();
+
         // Try to enter the room
 
-        var observerId = G.Comm.IssueObserverId();
-        var t1 = user.EnterRoom(roomName, observerId);
+        var observer = G.Comm.CreateObserver<IRoomObserver>(chatPanel);
+        var t1 = user.EnterRoom(roomName, observer);
         yield return t1.WaitHandle;
 
         if (t1.Status != TaskStatus.RanToCompletion)
         {
+            observer.Dispose();
+            GameObject.DestroyObject(go);
             Debug.LogError(t1.Exception.ToString());
             yield break;
         }
 
         // Spawn new room item
 
-        var go = UiHelper.AddChild(ContentPanel, ChatPanelTemplate);
-        var chatPanel = go.GetComponent<ChatPanel>();
-        var occupant = new OccupantRef(new SlimActorRef(t1.Result.Item1), new SlimRequestWaiter(G.Comm, this), null);
+        var occupant = (OccupantRef)t1.Result.Item1;
         chatPanel.SetOccupant(occupant);
         chatPanel.SetRoomInfo(t1.Result.Item2);
         chatPanel.ExitButtonClicked = () => OnRoomExitClick(roomName);
@@ -161,12 +163,10 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
         {
             ChatPanel = chatPanel,
             Occupant = occupant,
-            ObserverId = observerId
+            Observer = (RoomObserver)observer
         };
         _roomItemMap.Add(roomName, item);
         ControlPanel.AddRoomItem(roomName);
-        var observer = new ObserverEventDispatcher(chatPanel);
-        G.Comm.AddObserver(observerId, observer);
 
         // Select
 
@@ -211,7 +211,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
             _roomItemMap.Remove(roomName);
             Destroy(item.ChatPanel.gameObject);
-            G.Comm.RemoveObserver(item.ObserverId);
+            item.Observer.Dispose();
             ControlPanel.DeleteRoomItem(roomName);
 
             OnRoomItemClick("#general");

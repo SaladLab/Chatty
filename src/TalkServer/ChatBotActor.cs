@@ -3,7 +3,6 @@ using System.Net;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Interfaced;
-using Akka.Interfaced.SlimSocket.Server;
 using Common.Logging;
 using Domain;
 
@@ -22,7 +21,7 @@ namespace TalkServer
         }
     }
 
-    public class ChatBotActor : InterfacedActor<ChatBotActor>
+    public class ChatBotActor : InterfacedActor
     {
         private readonly ILog _log;
         private readonly ClusterNodeContext _clusterContext;
@@ -45,6 +44,8 @@ namespace TalkServer
 
             _userId = m.UserId;
 
+            // TODO
+            /*
             // start login
 
             var userLoginActor = Context.ActorOf(Props.Create(
@@ -69,6 +70,7 @@ namespace TalkServer
             await _user.ExitFromRoom(m.RoomName);
 
             _user.Actor.Tell(new ActorBoundSessionMessage.SessionTerminated());
+            */
 
             Context.Stop(Self);
         }

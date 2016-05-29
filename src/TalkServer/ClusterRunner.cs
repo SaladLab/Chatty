@@ -243,11 +243,14 @@ namespace TalkServer
         public UserClusterSystem(ClusterNodeContext context)
         {
             _context = context;
+
+            var typeModel = TypeModel.Create();
+            Akka.Interfaced.SlimSocket.Base.AutoSurrogate.Register(typeModel);
             _tcpConnectionSettings = new TcpConnectionSettings
             {
                 PacketSerializer = new PacketSerializer(
                     new PacketSerializerBase.Data(
-                        new ProtoBufMessageSerializer(TypeModel.Create()),
+                        new ProtoBufMessageSerializer(typeModel),
                         new TypeAliasTable()))
             };
         }

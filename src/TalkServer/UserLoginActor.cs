@@ -5,14 +5,13 @@ using Akka.Actor;
 using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Akka.Interfaced.LogFilter;
-using Akka.Interfaced.SlimSocket.Server;
 using Common.Logging;
 using Domain;
 
 namespace TalkServer
 {
     [Log]
-    public class UserLoginActor : InterfacedActor<UserLoginActor>, IUserLogin
+    public class UserLoginActor : InterfacedActor, IUserLogin
     {
         private readonly ILog _logger;
         private readonly ClusterNodeContext _clusterContext;
@@ -32,7 +31,7 @@ namespace TalkServer
             Context.Stop(Self);
         }
 
-        async Task<int> IUserLogin.Login(string id, string password, int observerId)
+        async Task<IUser> IUserLogin.Login(string id, string password, IUserEventObserver observer)
         {
             //Contract.Requires<ArgumentNullException>(id != null);
             //Contract.Requires<ArgumentNullException>(password != null);
@@ -48,7 +47,7 @@ namespace TalkServer
             try
             {
                 user = Context.System.ActorOf(
-                    Props.Create<UserActor>(_clusterContext, _clientSession, id, observerId),
+                    Props.Create(() => new UserActor(_clusterContext, _clientSession, id, observer)),
                     "user_" + id);
             }
             catch (Exception)
@@ -81,7 +80,7 @@ namespace TalkServer
             var reply2 = await _clientSession.Ask<ActorBoundSessionMessage.BindReply>(
                 new ActorBoundSessionMessage.Bind(user, typeof(IUser), null));
 
-            return reply2.ActorId;
+            return BoundActorRef.Create<UserRef>(reply2.ActorId);
         }
     }
 }

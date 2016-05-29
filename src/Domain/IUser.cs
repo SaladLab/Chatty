@@ -9,7 +9,7 @@ namespace Domain
     {
         Task<string> GetId();
         Task<List<string>> GetRoomList();
-        Task<Tuple<int, RoomInfo>> EnterRoom(string name, int observerId);
+        Task<Tuple<IOccupant, RoomInfo>> EnterRoom(string name, IRoomObserver observer);
         Task ExitFromRoom(string name);
         Task Whisper(string targetUserId, string message);
     }
