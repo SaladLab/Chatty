@@ -32,12 +32,16 @@ namespace TalkServer
         [MessageHandler]
         private void Handle(ChatBotCommanderMessage.Start m)
         {
+            // waits for a while untile system is fully initailized.
+
             if (_clusterContext.UserTable == null ||
                 _clusterContext.RoomTable == null)
             {
                 Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromSeconds(1), Self, m, Self);
                 return;
             }
+
+            // make one bot
 
             var chatBot = Context.ActorOf(Props.Create(() => new ChatBotActor(_clusterContext, "bot1")));
             chatBot.Tell(new ChatBotMessage.Start { UserId = "bot1", RoomName = "#bot" });

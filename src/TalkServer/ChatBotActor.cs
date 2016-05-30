@@ -21,7 +21,7 @@ namespace TalkServer
         }
     }
 
-    public class ChatBotActor : InterfacedActor
+    public class ChatBotActor : InterfacedActor, IUserEventObserver, IRoomObserver
     {
         private readonly ILog _log;
         private readonly ClusterNodeContext _clusterContext;
@@ -44,18 +44,16 @@ namespace TalkServer
 
             _userId = m.UserId;
 
-            // TODO
-            /*
-            // start login
+            // login by itself
 
             var userLoginActor = Context.ActorOf(Props.Create(
                 () => new UserLoginActor(_clusterContext, Self, new IPEndPoint(IPAddress.Loopback, 0))));
             var userLogin = new UserLoginRef(userLoginActor, this, null);
-            await userLogin.Login(_userId, m.UserId, 1);
+            await userLogin.Login(_userId, m.UserId, CreateObserver<IUserEventObserver>());
 
-            // enter chat
+            // enter room
 
-            await _user.EnterRoom(m.RoomName, 2);
+            await _user.EnterRoom(m.RoomName, CreateObserver<IRoomObserver>());
 
             // chat !
 
@@ -70,7 +68,6 @@ namespace TalkServer
             await _user.ExitFromRoom(m.RoomName);
 
             _user.Actor.Tell(new ActorBoundSessionMessage.SessionTerminated());
-            */
 
             Context.Stop(Self);
         }
@@ -87,19 +84,39 @@ namespace TalkServer
             if (m.InterfaceType == typeof(IUser))
             {
                 _user = new UserRef(m.Actor, this, null);
-                Sender.Tell(new ActorBoundSessionMessage.BindReply(0));
+                Sender.Tell(new ActorBoundSessionMessage.BindReply(1));
                 return;
             }
 
             if (m.InterfaceType == typeof(IOccupant))
             {
                 _occupant = new OccupantRef(m.Actor, this, null);
-                Sender.Tell(new ActorBoundSessionMessage.BindReply(0));
+                Sender.Tell(new ActorBoundSessionMessage.BindReply(1));
                 return;
             }
 
             _log.ErrorFormat("Unexpected bind type. (InterfaceType={0}, Actor={1})",
                              m.InterfaceType?.FullName, m.Actor);
+        }
+
+        void IUserEventObserver.Whisper(ChatItem chatItem)
+        {
+        }
+
+        void IUserEventObserver.Invite(string invitorUserId, string roomName)
+        {
+        }
+
+        void IRoomObserver.Enter(string userId)
+        {
+        }
+
+        void IRoomObserver.Exit(string userId)
+        {
+        }
+
+        void IRoomObserver.Say(ChatItem chatItem)
+        {
         }
     }
 }

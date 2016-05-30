@@ -11,6 +11,7 @@ using Domain;
 namespace TalkServer
 {
     [Log]
+    [ResponsiveException(typeof(ResultException))]
     public class UserLoginActor : InterfacedActor, IUserLogin
     {
         private readonly ILog _logger;

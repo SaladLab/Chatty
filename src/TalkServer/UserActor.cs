@@ -12,6 +12,7 @@ using Domain;
 namespace TalkServer
 {
     [Log]
+    [ResponsiveException(typeof(ResultException))]
     public class UserActor : InterfacedActor, IUser, IUserMessasing
     {
         private ILog _logger;
@@ -86,6 +87,9 @@ namespace TalkServer
 
         async Task IUser.ExitFromRoom(string name)
         {
+            if (string.IsNullOrEmpty(name))
+                throw new ResultException(ResultCodeType.NeedToBeInRoom);
+
             RoomRef room;
             if (_enteredRoomMap.TryGetValue(name, out room) == false)
                 throw new ResultException(ResultCodeType.NeedToBeInRoom);

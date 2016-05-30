@@ -13,7 +13,7 @@ namespace TalkClient.Console
         {
             var serializer = new PacketSerializer(
                 new PacketSerializerBase.Data(
-                    new ProtoBufMessageSerializer(TypeModel.Create()),
+                    new ProtoBufMessageSerializer(PacketSerializer.CreateTypeModel()),
                     new TypeAliasTable()));
 
             var communicator = new Communicator(LogManager.GetLogger("Communicator"),

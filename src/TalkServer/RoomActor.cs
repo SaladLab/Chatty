@@ -13,6 +13,7 @@ using Domain;
 namespace TalkServer
 {
     [Log]
+    [ResponsiveException(typeof(ResultException))]
     public class RoomActor : InterfacedActor, IRoom, IOccupant
     {
         private class UserData
