@@ -19,8 +19,14 @@ namespace TalkClient.Console
         {
             _communicator = communicator;
 
+            WriteLine("[ ChatConsole ]");
+
             _user = await LoginAsync();
+            WriteLine("# logined");
+
             await EnterRoomAsync("#general");
+            WriteLine("# entered #general channel");
+
             await ChatLoopAsync();
         }
 
@@ -42,6 +48,9 @@ namespace TalkClient.Console
 
         private async Task ChatLoopAsync()
         {
+            ShowCommandHelp();
+            WriteLine("");
+
             while (true)
             {
                 var line = await ReadLineAsync();
@@ -146,6 +155,12 @@ namespace TalkClient.Console
                             }
                             break;
 
+                        case "/?":
+                        case "/h":
+                        case "/help":
+                            ShowCommandHelp();
+                            break;
+
                         default:
                             WriteLine("Invalid command: " + words[0]);
                             break;
@@ -163,6 +178,16 @@ namespace TalkClient.Console
                     }
                 }
             }
+        }
+
+        private void ShowCommandHelp()
+        {
+            WriteLine("Commands:");
+            WriteLine("  /e channel   Enter channel                   (alias: /enter /j /join)");
+            WriteLine("  /x [channel] Leave (current) channel         (alias: /exit /l /leave)");
+            WriteLine("  /c [channel] Show or change current channel  (alias: /current)");
+            WriteLine("  /i user      Invite user                     (alias: /invite)");
+            WriteLine("  /w user msg  Whisper to user                 (alias: /whisper)");
         }
 
         private Task<string> ReadLineAsync()
