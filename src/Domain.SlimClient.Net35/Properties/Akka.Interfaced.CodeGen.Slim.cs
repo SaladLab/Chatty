@@ -991,25 +991,9 @@ namespace Domain
         public static Type[] GetPayloadTypes()
         {
             return new Type[] {
-                typeof(Whisper_Invoke),
                 typeof(Invite_Invoke),
+                typeof(Whisper_Invoke),
             };
-        }
-
-        [ProtoContract, TypeAlias]
-        public class Whisper_Invoke : IInterfacedPayload, IInvokable
-        {
-            [ProtoMember(1)] public Domain.ChatItem chatItem;
-
-            public Type GetInterfaceType()
-            {
-                return typeof(IUserEventObserver);
-            }
-
-            public void Invoke(object __target)
-            {
-                ((IUserEventObserver)__target).Whisper(chatItem);
-            }
         }
 
         [ProtoContract, TypeAlias]
@@ -1028,6 +1012,22 @@ namespace Domain
                 ((IUserEventObserver)__target).Invite(invitorUserId, roomName);
             }
         }
+
+        [ProtoContract, TypeAlias]
+        public class Whisper_Invoke : IInterfacedPayload, IInvokable
+        {
+            [ProtoMember(1)] public Domain.ChatItem chatItem;
+
+            public Type GetInterfaceType()
+            {
+                return typeof(IUserEventObserver);
+            }
+
+            public void Invoke(object __target)
+            {
+                ((IUserEventObserver)__target).Whisper(chatItem);
+            }
+        }
     }
 
     public class UserEventObserver : InterfacedObserver, IUserEventObserver
@@ -1042,15 +1042,15 @@ namespace Domain
         {
         }
 
-        public void Whisper(Domain.ChatItem chatItem)
-        {
-            var payload = new IUserEventObserver_PayloadTable.Whisper_Invoke { chatItem = chatItem };
-            Notify(payload);
-        }
-
         public void Invite(System.String invitorUserId, System.String roomName)
         {
             var payload = new IUserEventObserver_PayloadTable.Invite_Invoke { invitorUserId = invitorUserId, roomName = roomName };
+            Notify(payload);
+        }
+
+        public void Whisper(Domain.ChatItem chatItem)
+        {
+            var payload = new IUserEventObserver_PayloadTable.Whisper_Invoke { chatItem = chatItem };
             Notify(payload);
         }
     }
