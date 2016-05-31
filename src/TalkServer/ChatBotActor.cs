@@ -5,6 +5,7 @@ using Akka.Actor;
 using Akka.Interfaced;
 using Common.Logging;
 using Domain;
+using Akka.Cluster.Utility;
 
 namespace TalkServer
 {
@@ -21,7 +22,7 @@ namespace TalkServer
         }
     }
 
-    public class ChatBotActor : InterfacedActor, IUserEventObserver, IRoomObserver
+    public class ChatBotActor : InterfacedActor, IExtendedInterface<IUserEventObserver, IRoomObserver>
     {
         private readonly ILog _log;
         private readonly ClusterNodeContext _clusterContext;
@@ -59,8 +60,8 @@ namespace TalkServer
 
             while (_stopped == false)
             {
-                await _occupant.Say(DateTime.Now.ToString(), _userId);
-                await Task.Delay(1000);
+                await SayAsync(DateTime.Now.ToString());
+                await Task.Delay(5000);
             }
 
             // outro
@@ -99,24 +100,64 @@ namespace TalkServer
                              m.InterfaceType?.FullName, m.Actor);
         }
 
-        void IUserEventObserver.Whisper(ChatItem chatItem)
+        private async Task SayAsync(string message)
         {
+            if (_occupant != null)
+                await _occupant.Say(message, _userId);
         }
 
-        void IUserEventObserver.Invite(string invitorUserId, string roomName)
+        private async Task<bool> WhisperToAsync(string targetUserId, string message)
         {
+            if (_clusterContext.UserTable == null)
+                return false;
+
+            var reply = await _clusterContext.UserTable.Ask<DistributedActorTableMessage<string>.GetReply>(
+                new DistributedActorTableMessage<string>.Get(targetUserId));
+            var targetUser = reply.Actor;
+            if (targetUser == null)
+                return false;
+
+            var chatItem = new ChatItem
+            {
+                UserId = _userId,
+                Time = DateTime.UtcNow,
+                Message = message
+            };
+
+            var targetUserMessaging = new UserMessasingRef(targetUser);
+            targetUserMessaging.WithNoReply().Whisper(chatItem);
+            return true;
         }
 
-        void IRoomObserver.Enter(string userId)
+        [ExtendedHandler]
+        private Task Whisper(ChatItem chatItem)
         {
+            return WhisperToAsync(chatItem.UserId, $"Wow you sent a whisper (length={chatItem.Message.Length})");
         }
 
-        void IRoomObserver.Exit(string userId)
+        [ExtendedHandler]
+        private Task Invite(string invitorUserId, string roomName)
         {
+            return WhisperToAsync(invitorUserId, "Thanks for invitation but I cannot move.");
         }
 
-        void IRoomObserver.Say(ChatItem chatItem)
+        [ExtendedHandler]
+        private Task Enter(string userId)
         {
+            return SayAsync($"Hello {userId}!");
+        }
+
+        [ExtendedHandler]
+        private Task Exit(string userId)
+        {
+            return SayAsync($"I'll miss {userId}...");
+        }
+
+        [ExtendedHandler]
+        private async Task Say(ChatItem chatItem)
+        {
+            if (chatItem.UserId != _userId && chatItem.Message.Contains("bot?"))
+                await SayAsync($"Yes I'm a bot.");
         }
     }
 }
