@@ -17,43 +17,45 @@ namespace TalkClient.Console
             new Dictionary<string, Tuple<OccupantRef, RoomObserver>>();
         private string _currentRoomName;
 
-        public async Task RunAsync(Communicator communicator)
+        public async Task RunAsync(Communicator communicator, string userId, string password)
         {
             _communicator = communicator;
 
-            WriteLine("[ ChatConsole ]");
+            ConsoleUtil.Out("[ Chatty.Console ]");
+            ConsoleUtil.Out("");
 
-            await LoginAsync();
-            WriteLine("# logined");
+            OnCommandShowHelp();
+            ConsoleUtil.Out("");
 
-            await EnterRoomAsync("#general");
-            WriteLine("# entered #general channel");
+            if (await LoginAsync(userId, password) == false)
+                return;
 
+            await OnCommandEnterRoom("", "#general");
             await ChatLoopAsync();
         }
 
-        private async Task LoginAsync()
+        private async Task<bool> LoginAsync(string userId, string password)
         {
             var userLogin = _communicator.CreateRef<UserLoginRef>();
             var observer = _communicator.CreateObserver<IUserEventObserver>(this);
 
             try
             {
-                _user = (UserRef)(await userLogin.Login("console", "1234", observer));
+                _user = (UserRef)(await userLogin.Login(userId, password, observer));
                 _userEventObserver = (UserEventObserver)observer;
+                ConsoleUtil.Sys($"{userId} logined.");
+                return true;
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 observer.Dispose();
-                throw;
+                ConsoleUtil.Err($"Failed to login {userId} with " + e);
+                return false;
             }
         }
 
         private async Task ChatLoopAsync()
         {
-            OnCommandShowHelp();
-            WriteLine("");
-
             while (true)
             {
                 var line = await ReadLineAsync();
@@ -99,8 +101,13 @@ namespace TalkClient.Console
                             OnCommandShowHelp();
                             break;
 
+                        case "/q":
+                        case "/quit":
+                            ConsoleUtil.Sys("Bye!");
+                            return;
+
                         default:
-                            WriteLine("Invalid command: " + words[0]);
+                            ConsoleUtil.Err("Invalid command: " + words[0]);
                             break;
                     }
                 }
@@ -108,7 +115,7 @@ namespace TalkClient.Console
                 {
                     if (string.IsNullOrEmpty(_currentRoomName))
                     {
-                        WriteLine("Need a room to say");
+                        ConsoleUtil.Err("Need a room to say");
                     }
                     else
                     {
@@ -118,39 +125,48 @@ namespace TalkClient.Console
             }
         }
 
-        private async Task OnCommandEnterRoom(string[] words)
+        private async Task OnCommandEnterRoom(params string[] words)
         {
             try
             {
-                await EnterRoomAsync(words[1]);
+                var name = words[1];
+                var info = await EnterRoomAsync(name);
+                ConsoleUtil.Sys($"entered {name}");
+
+                if (info.History != null)
+                {
+                    foreach (var chatItem in info.History.Skip(Math.Max(0, info.History.Count() - 5)))
+                        ConsoleUtil.Out($"[{name}] {chatItem.UserId}: {chatItem.Message}");
+                }
             }
             catch (Exception e)
             {
-                WriteLine("Failed to join: " + e);
+                ConsoleUtil.Err("Failed to join: " + e);
             }
         }
 
-        private async Task OnCommandExitFromRoom(string[] words)
+        private async Task OnCommandExitFromRoom(params string[] words)
         {
             try
             {
                 var room = words.Length > 1 ? words[1] : _currentRoomName;
                 if (string.IsNullOrEmpty(room))
                 {
-                    WriteLine("No room to exit.");
+                    ConsoleUtil.Err("No room to exit.");
                     return;
                 }
                 await ExitRoomAsync(room);
+                ConsoleUtil.Sys($"exited from {room}");
                 if (_roomMap.ContainsKey(_currentRoomName) == false)
                     _currentRoomName = _roomMap.Keys.FirstOrDefault();
             }
             catch (Exception e)
             {
-                WriteLine("Failed to leave:" + e);
+                ConsoleUtil.Err("Failed to leave:" + e);
             }
         }
 
-        private void OnCommandCurrentChannel(string[] words)
+        private void OnCommandCurrentChannel(params string[] words)
         {
             if (words.Length > 1)
             {
@@ -158,44 +174,44 @@ namespace TalkClient.Console
                 if (_roomMap.ContainsKey(roomName))
                 {
                     _currentRoomName = roomName;
-                    WriteLine($"Current room is changed to {_currentRoomName}");
+                    ConsoleUtil.Sys($"Current room is changed to {_currentRoomName}");
                 }
                 else
                 {
-                    WriteLine($"No room");
+                    ConsoleUtil.Err($"No room");
                 }
             }
             else
             {
-                WriteLine($"Current room: {_currentRoomName}");
+                ConsoleUtil.Sys($"Current room: {_currentRoomName}");
             }
         }
 
-        private async Task OnCommandInviteUser(string[] words)
+        private async Task OnCommandInviteUser(params string[] words)
         {
             if (string.IsNullOrEmpty(_currentRoomName))
             {
-                WriteLine("Need a room to invite");
+                ConsoleUtil.Err("Need a room to invite");
             }
             else
             {
                 var occupant = _roomMap[_currentRoomName].Item1;
                 for (var i = 1; i < words.Length; i++)
                 {
-                    WriteLine("Invite: " + words[i]);
                     try
                     {
                         await occupant.Invite(words[i]);
+                        ConsoleUtil.Sys("Invite: " + words[i]);
                     }
                     catch (Exception e)
                     {
-                        WriteLine("Failed to invite: " + e);
+                        ConsoleUtil.Err("Failed to invite: " + e);
                     }
                 }
             }
         }
 
-        private async Task OnCommandWhisper(string[] words)
+        private async Task OnCommandWhisper(params string[] words)
         {
             if (words.Length >= 3)
             {
@@ -204,22 +220,28 @@ namespace TalkClient.Console
                     var targetUser = words[1];
                     var message = string.Join(" ", words.Skip(2));
                     await _user.Whisper(targetUser, message);
+                    ConsoleUtil.Sys($"Whisper to {targetUser}");
                 }
                 catch (Exception e)
                 {
-                    WriteLine("Failed to whisper: " + e);
+                    ConsoleUtil.Err("Failed to whisper: " + e);
                 }
+            }
+            else
+            {
+                ConsoleUtil.Sys("Not enough parameters");
             }
         }
 
         private void OnCommandShowHelp()
         {
-            WriteLine("Commands:");
-            WriteLine("  /e channel   Enter channel                   (alias: /enter /j /join)");
-            WriteLine("  /x [channel] Exit from (current) channel     (alias: /exit /l /leave)");
-            WriteLine("  /c [channel] Show or set current channel     (alias: /current)");
-            WriteLine("  /i user      Invite user                     (alias: /invite)");
-            WriteLine("  /w user msg  Whisper to user                 (alias: /whisper)");
+            ConsoleUtil.Out("Commands:");
+            ConsoleUtil.Out("  /e channel   Enter channel                   (alias: /enter /j /join)");
+            ConsoleUtil.Out("  /x [channel] Exit from (current) channel     (alias: /exit /l /leave)");
+            ConsoleUtil.Out("  /c [channel] Show or set current channel     (alias: /current)");
+            ConsoleUtil.Out("  /i user      Invite user                     (alias: /invite)");
+            ConsoleUtil.Out("  /w user msg  Whisper to user                 (alias: /whisper)");
+            ConsoleUtil.Out("  /q           Quit                            (alias: /quit)");
         }
 
         private Task<string> ReadLineAsync()
@@ -231,11 +253,6 @@ namespace TalkClient.Console
             var tcs = new TaskCompletionSource<string>();
             ThreadPool.QueueUserWorkItem(_ => { tcs.SetResult(System.Console.ReadLine()); });
             return tcs.Task;
-        }
-
-        private void WriteLine(string str)
-        {
-            System.Console.WriteLine(str);
         }
 
         private async Task<RoomInfo> EnterRoomAsync(string name)
@@ -268,12 +285,12 @@ namespace TalkClient.Console
 
         void IUserEventObserver.Invite(string invitorUserId, string roomName)
         {
-            WriteLine($"<Invite> [invitorUserId] invites you to {roomName}");
+            ConsoleUtil.Sys($"<Invite> {invitorUserId} invites you to {roomName}");
         }
 
         void IUserEventObserver.Whisper(ChatItem chatItem)
         {
-            WriteLine($"<Whisper> {chatItem.UserId}: {chatItem.Message}");
+            ConsoleUtil.Sys($"<Whisper> {chatItem.UserId}: {chatItem.Message}");
         }
 
         private class RoomConsole : IRoomObserver
@@ -287,22 +304,17 @@ namespace TalkClient.Console
 
             public void Enter(string userId)
             {
-                WriteLine($"[{_name}] {userId} Entered");
+                ConsoleUtil.Out($"[{_name}] {userId} Entered");
             }
 
             public void Exit(string userId)
             {
-                WriteLine($"[{_name}] {userId} Exited");
+                ConsoleUtil.Out($"[{_name}] {userId} Exited");
             }
 
             public void Say(ChatItem chatItem)
             {
-                WriteLine($"[{_name}] {chatItem.UserId}: {chatItem.Message}");
-            }
-
-            private void WriteLine(string str)
-            {
-                System.Console.WriteLine(str);
+                ConsoleUtil.Out($"[{_name}] {chatItem.UserId}: {chatItem.Message}");
             }
         }
     }

@@ -1,8 +1,8 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using Akka.Interfaced.SlimSocket.Base;
 using Akka.Interfaced.SlimSocket.Client;
 using Common.Logging;
-using ProtoBuf.Meta;
 using TypeAlias;
 
 namespace TalkClient.Console
@@ -21,8 +21,11 @@ namespace TalkClient.Console
                                                 _ => new TcpConnection(serializer, LogManager.GetLogger("Connection")));
             communicator.Start();
 
+            var userId = args.Length > 0 ? args[0] : "console";
+            var password = args.Length > 1 ? args[1] : userId;
+
             var driver = new ChatConsole();
-            driver.RunAsync(communicator).Wait();
+            driver.RunAsync(communicator, userId, password).Wait();
         }
     }
 }
