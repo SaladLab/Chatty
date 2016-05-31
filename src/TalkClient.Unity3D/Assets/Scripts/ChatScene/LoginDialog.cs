@@ -77,6 +77,7 @@ public class LoginDialog : UiDialog
             yield return t1.WaitHandle;
             if (t1.Exception != null)
             {
+                observer.Dispose();
                 var re = t1.Exception as ResultException;
                 if (re != null)
                 {
