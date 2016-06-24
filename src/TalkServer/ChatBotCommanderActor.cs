@@ -6,6 +6,7 @@ using Common.Logging;
 
 namespace TalkServer
 {
+    /*
     public class ChatBotCommanderMessage
     {
         public class Start
@@ -32,7 +33,7 @@ namespace TalkServer
         [MessageHandler]
         private void Handle(ChatBotCommanderMessage.Start m)
         {
-            // waits for a while untile system is fully initailized.
+            // waits for a while until system is fully initailized.
 
             if (_clusterContext.UserTable == null ||
                 _clusterContext.RoomTable == null)
@@ -79,4 +80,5 @@ namespace TalkServer
                 Context.Stop(Self);
         }
     }
+    */
 }

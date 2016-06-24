@@ -9,15 +9,17 @@ namespace Domain
     public enum ResultCodeType
     {
         None = 0,
-        LoginFailedNoUser = 1,
-        LoginFailedIncorrectPassword = 2,
-        LoginFailedAlreadyConnected = 3,
-        NeedToBeInRoom = 4,
-        NeedToBeOutOfRoom = 5,
-        RoomRemoved = 6,
-        UserNotMyself = 7,
-        UserNotOnline = 8,
-        UserAlreadyHere = 9
+        ArgumentError = 1,
+        InternalError = 2,
+        LoginFailedNoUser = 3,
+        LoginFailedIncorrectPassword = 4,
+        LoginFailedAlreadyConnected = 5,
+        NeedToBeInRoom = 6,
+        NeedToBeOutOfRoom = 7,
+        RoomRemoved = 8,
+        UserNotMyself = 9,
+        UserNotOnline = 10,
+        UserAlreadyHere = 11
     }
 
     [ProtoContract, TypeAlias]

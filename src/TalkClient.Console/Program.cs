@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Net;
-using Akka.Interfaced.SlimSocket.Base;
+using Akka.Interfaced.SlimSocket;
 using Akka.Interfaced.SlimSocket.Client;
 using Common.Logging;
 using TypeAlias;
@@ -11,6 +11,15 @@ namespace TalkClient.Console
     {
         private static void Main(string[] args)
         {
+            // create channel
+
+            var channelFactory = ChannelFactoryBuilder.Build<DomainProtobufSerializer>(
+                endPoint: new IPEndPoint(IPAddress.Loopback, 9001),
+                createChannelLogger: () => LogManager.GetLogger("Channel"));
+            channelFactory.Type = channelType;
+            var channel = channelFactory.Create();
+
+            /*
             var serializer = new PacketSerializer(
                 new PacketSerializerBase.Data(
                     new ProtoBufMessageSerializer(PacketSerializer.CreateTypeModel()),
@@ -26,6 +35,7 @@ namespace TalkClient.Console
 
             var driver = new ChatConsole();
             driver.RunAsync(communicator, userId, password).Wait();
+            */
         }
     }
 }

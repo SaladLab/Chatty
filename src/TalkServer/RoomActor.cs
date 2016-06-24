@@ -18,7 +18,7 @@ namespace TalkServer
     {
         private class UserData
         {
-            public UserRef UserActor;
+            // public UserRef UserActor;
             public RoomObserver Observer;
         }
 
@@ -102,7 +102,7 @@ namespace TalkServer
 
             _userMap[userId] = new UserData
             {
-                UserActor = new UserRef(Sender, this, null),
+                // UserActor = new UserRef(Sender, this, null),
                 Observer = (RoomObserver)observer
             };
 
@@ -166,8 +166,7 @@ namespace TalkServer
             if (targetUser == null)
                 throw new ResultException(ResultCodeType.UserNotOnline);
 
-            var targetUserMessaging = new UserMessasingRef(targetUser);
-            targetUserMessaging.WithNoReply().Invite(senderUserId, _name);
+            targetUser.Cast<UserMessasingRef>().WithNoReply().Invite(senderUserId, _name);
         }
     }
 }

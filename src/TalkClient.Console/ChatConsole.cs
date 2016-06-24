@@ -10,16 +10,16 @@ namespace TalkClient.Console
 {
     internal class ChatConsole : IUserEventObserver
     {
-        private Communicator _communicator;
+        private IChannel _channel;
         private UserRef _user;
         private UserEventObserver _userEventObserver;
         private Dictionary<string, Tuple<OccupantRef, RoomObserver>> _roomMap =
             new Dictionary<string, Tuple<OccupantRef, RoomObserver>>();
         private string _currentRoomName;
 
-        public async Task RunAsync(Communicator communicator, string userId, string password)
+        public async Task RunAsync(IChannel channel, string userId, string password)
         {
-            _communicator = communicator;
+            _channel = channel;
 
             ConsoleUtil.Out("[ Chatty.Console ]");
             ConsoleUtil.Out("");
@@ -36,8 +36,8 @@ namespace TalkClient.Console
 
         private async Task<bool> LoginAsync(string userId, string password)
         {
-            var userLogin = _communicator.CreateRef<UserLoginRef>();
-            var observer = _communicator.CreateObserver<IUserEventObserver>(this);
+            var userLogin = _channel.CreateRef<UserLoginRef>();
+            var observer = _channel.CreateObserver<IUserEventObserver>(this);
 
             try
             {
@@ -48,7 +48,7 @@ namespace TalkClient.Console
             }
             catch (Exception e)
             {
-                observer.Dispose();
+                _channel.RemoveObserver(observer);
                 ConsoleUtil.Err($"Failed to login {userId} with " + e);
                 return false;
             }
@@ -257,7 +257,7 @@ namespace TalkClient.Console
 
         private async Task<RoomInfo> EnterRoomAsync(string name)
         {
-            var observer = _communicator.CreateObserver<IRoomObserver>(new RoomConsole(name));
+            var observer = _channel.CreateObserver<IRoomObserver>(new RoomConsole(name));
             try
             {
                 var ret = await _user.EnterRoom(name, observer);
@@ -267,7 +267,7 @@ namespace TalkClient.Console
             }
             catch (Exception)
             {
-                observer.Dispose();
+                _channel.RemoveObserver(observer);
                 throw;
             }
         }
@@ -279,7 +279,7 @@ namespace TalkClient.Console
                 throw new Exception("Cannot find room: " + name);
 
             await _user.ExitFromRoom(name);
-            item.Item2.Dispose();
+            _channel.RemoveObserver(item.Item2);
             _roomMap.Remove(name);
         }
 

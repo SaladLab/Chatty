@@ -2,13 +2,14 @@
 using System.Net;
 using System.Threading.Tasks;
 using Akka.Actor;
+using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Common.Logging;
 using Domain;
-using Akka.Cluster.Utility;
 
 namespace TalkServer
 {
+    /*
     public static class ChatBotMessage
     {
         public class Start
@@ -47,9 +48,8 @@ namespace TalkServer
 
             // login by itself
 
-            var userLoginActor = Context.ActorOf(Props.Create(
-                () => new UserLoginActor(_clusterContext, Self, new IPEndPoint(IPAddress.Loopback, 0))));
-            var userLogin = new UserLoginRef(userLoginActor, this, null);
+            var userLogin = Context.ActorOf(Props.Create(() => new UserLoginActor(_clusterContext, Self, new IPEndPoint(IPAddress.Loopback, 0))))
+                                   .Cast<UserLoginRef>().WithRequestWaiter(this);
             await userLogin.Login(_userId, m.UserId, CreateObserver<IUserEventObserver>());
 
             // enter room
@@ -117,15 +117,12 @@ namespace TalkServer
             if (targetUser == null)
                 return false;
 
-            var chatItem = new ChatItem
+            targetUser.Cast<UserMessasingRef>().WithNoReply().Whisper(new ChatItem
             {
                 UserId = _userId,
                 Time = DateTime.UtcNow,
                 Message = message
-            };
-
-            var targetUserMessaging = new UserMessasingRef(targetUser);
-            targetUserMessaging.WithNoReply().Whisper(chatItem);
+            });
             return true;
         }
 
@@ -160,4 +157,5 @@ namespace TalkServer
                 await SayAsync($"Yes I'm a bot.");
         }
     }
+    */
 }

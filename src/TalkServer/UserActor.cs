@@ -6,6 +6,7 @@ using Akka.Actor;
 using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Akka.Interfaced.LogFilter;
+using Akka.Interfaced.SlimServer;
 using Common.Logging;
 using Domain;
 
@@ -17,26 +18,26 @@ namespace TalkServer
     {
         private ILog _logger;
         private ClusterNodeContext _clusterContext;
-        private IActorRef _clientSession;
+        private ActorBoundChannelRef _channel;
         private string _id;
         private UserEventObserver _eventObserver;
         private Dictionary<string, RoomRef> _enteredRoomMap;
 
-        public UserActor(ClusterNodeContext clusterContext, IActorRef clientSession, string id, IUserEventObserver observer)
+        public UserActor(ClusterNodeContext clusterContext, ActorBoundChannelRef channel,
+                         string id, IUserEventObserver observer)
         {
             _logger = LogManager.GetLogger($"UserActor({id})");
             _clusterContext = clusterContext;
-            _clientSession = clientSession;
+            _channel = channel;
             _id = id;
             _eventObserver = (UserEventObserver)observer;
             _enteredRoomMap = new Dictionary<string, RoomRef>();
         }
 
-        [MessageHandler]
-        private void OnMessage(ActorBoundSessionMessage.SessionTerminated message)
+        protected override void PostStop()
         {
             UnlinkAll();
-            Context.Stop(Self);
+            base.PostStop();
         }
 
         private void UnlinkAll()
@@ -55,7 +56,7 @@ namespace TalkServer
         {
             var reply = await _clusterContext.RoomTable.Ask<DistributedActorTableMessage<string>.GetIdsReply>(
                 new DistributedActorTableMessage<string>.GetIds());
-            return reply.Ids?.Select(x => (string)x).ToList();
+            return reply.Ids?.ToList();
         }
 
         async Task<Tuple<IOccupant, RoomInfo>> IUser.EnterRoom(string name, IRoomObserver observer)
@@ -70,19 +71,21 @@ namespace TalkServer
             if (reply.Actor == null)
                 throw new ResultException(ResultCodeType.RoomRemoved);
 
-            var room = new RoomRef(reply.Actor, this, null);
+            var room = reply.Actor.Cast<RoomRef>().WithRequestWaiter(this);
 
             // Let's enter the room !
 
             var info = await room.Enter(_id, observer);
 
-            // Bind an occupant actor with client session
+            // Bind an occupant actor to channel
 
-            var reply2 = await _clientSession.Ask<ActorBoundSessionMessage.BindReply>(
-                new ActorBoundSessionMessage.Bind(room.Actor, typeof(IOccupant), _id));
+            var boundActor = await _channel.BindActor(room.CastToIActorRef(),
+                                                      new[] { new TaggedType(typeof(IOccupant), _id) });
+            if (boundActor == null)
+                throw new ResultException(ResultCodeType.InternalError);
 
             _enteredRoomMap[name] = room;
-            return Tuple.Create((IOccupant)BoundActorRef.Create<OccupantRef>(reply2.ActorId), info);
+            return Tuple.Create((IOccupant)boundActor.Cast<OccupantRef>(), info);
         }
 
         async Task IUser.ExitFromRoom(string name)
@@ -98,9 +101,9 @@ namespace TalkServer
 
             await room.Exit(_id);
 
-            // Unbind an occupant actor with client session
+            // Unbind an occupant actor from channel
 
-            _clientSession.Tell(new ActorBoundSessionMessage.Unbind(room.Actor));
+            _channel.WithNoReply().UnbindActor(room.CastToIActorRef());
 
             _enteredRoomMap.Remove(name);
         }
@@ -119,15 +122,12 @@ namespace TalkServer
             if (targetUser == null)
                 throw new ResultException(ResultCodeType.UserNotOnline);
 
-            var chatItem = new ChatItem
+            targetUser.Cast<UserMessasingRef>().WithNoReply().Whisper(new ChatItem
             {
                 UserId = _id,
                 Time = DateTime.UtcNow,
                 Message = message
-            };
-
-            var targetUserMessaging = new UserMessasingRef(targetUser);
-            targetUserMessaging.WithNoReply().Whisper(chatItem);
+            });
         }
 
         Task IUserMessasing.Whisper(ChatItem chatItem)
