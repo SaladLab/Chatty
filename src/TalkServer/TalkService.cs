@@ -83,7 +83,7 @@ namespace TalkServer
                     }
                   }
                   cluster {
-                    seed-nodes = [""akka.tcp://GameCluster@127.0.0.1:3001""]
+                    seed-nodes = [""akka.tcp://ChatCluster@127.0.0.1:3001""]
                     auto-down-unreachable-after = 30s
                   }
                 }");

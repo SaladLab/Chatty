@@ -6,8 +6,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 using Domain;
+using Akka.Interfaced.SlimSocket;
 using Akka.Interfaced.SlimSocket.Client;
-using Akka.Interfaced.SlimSocket.Base;
 using Common.Logging;
 using TypeAlias;
 
@@ -66,18 +66,32 @@ public class LoginDialog : UiDialog
                 yield break;
             }
 
-            G.Comm = CommunicatorHelper.CreateCommunicator<DomainProtobufSerializer>(G.Logger, serverEndPoint);
-            G.Comm.Start();
+            var channelFactory = ChannelFactoryBuilder.Build<DomainProtobufSerializer>(
+                endPoint: serverEndPoint,
+                createChannelLogger: () => LogManager.GetLogger("Channel"));
+            channelFactory.Type = ChannelType.Tcp;
+            var channel = channelFactory.Create();
+
+            // connect to gateway
+
+            var t0 = channel.ConnectAsync();
+            yield return t0.WaitHandle;
+            if (t0.Exception != null)
+            {
+                SetMessage("Connection Failed: " + t0.Exception.Message);
+                yield break;
+            }
+            G.Channel = channel;
 
             // Try Login
 
-            var userLogin = G.Comm.CreateRef<UserLoginRef>();
-            var observer = G.Comm.CreateObserver<IUserEventObserver>(_userEventObserver);
+            var userLogin = G.Channel.CreateRef<UserLoginRef>();
+            var observer = G.Channel.CreateObserver(_userEventObserver);
             var t1 = userLogin.Login(id, password, observer);
             yield return t1.WaitHandle;
             if (t1.Exception != null)
             {
-                observer.Dispose();
+                channel.RemoveObserver(observer);
                 var re = t1.Exception as ResultException;
                 if (re != null)
                 {

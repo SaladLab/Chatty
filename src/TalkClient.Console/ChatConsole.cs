@@ -24,6 +24,11 @@ namespace TalkClient.Console
             ConsoleUtil.Out("[ Chatty.Console ]");
             ConsoleUtil.Out("");
 
+            ConsoleUtil.Out("Try to connect...");
+            await _channel.ConnectAsync();
+            ConsoleUtil.Out("Connected!");
+            ConsoleUtil.Out("");
+
             OnCommandShowHelp();
             ConsoleUtil.Out("");
 

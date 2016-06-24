@@ -1,6 +1,6 @@
-﻿using Common.Logging;
+﻿using Akka.Interfaced.SlimSocket.Client;
+using Common.Logging;
 using Domain;
-using Akka.Interfaced.SlimSocket.Client;
 
 public static class G
 {
@@ -9,14 +9,14 @@ public static class G
         _logger = LogManager.GetLogger("G");
     }
 
-    // Communicator
+    // Channel
 
-    private static Communicator _comm;
+    private static IChannel _channel;
 
-    public static Communicator Comm
+    public static IChannel Channel
     {
-        get { return _comm; }
-        set { _comm = value; }
+        get { return _channel; }
+        set { _channel = value; }
     }
 
     // Logger

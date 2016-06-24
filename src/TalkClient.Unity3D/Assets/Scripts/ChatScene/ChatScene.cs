@@ -140,13 +140,13 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
         // Try to enter the room
 
-        var observer = G.Comm.CreateObserver<IRoomObserver>(chatPanel);
+        var observer = G.Channel.CreateObserver<IRoomObserver>(chatPanel);
         var t1 = user.EnterRoom(roomName, observer);
         yield return t1.WaitHandle;
 
         if (t1.Status != TaskStatus.RanToCompletion)
         {
-            observer.Dispose();
+            G.Channel.RemoveObserver(observer);
             GameObject.DestroyObject(go);
             Debug.LogError(t1.Exception.ToString());
             yield break;
@@ -211,7 +211,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
             _roomItemMap.Remove(roomName);
             Destroy(item.ChatPanel.gameObject);
-            item.Observer.Dispose();
+            G.Channel.RemoveObserver(item.Observer);
             ControlPanel.DeleteRoomItem(roomName);
 
             OnRoomItemClick("#general");

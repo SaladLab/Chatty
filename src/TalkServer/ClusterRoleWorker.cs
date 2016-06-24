@@ -38,7 +38,7 @@ namespace TalkServer
         public override Task Start()
         {
             _userTable = Context.System.ActorOf(
-                Props.Create(() => new DistributedActorTable<long>("User", Context.ClusterActorDiscovery, null, null)),
+                Props.Create(() => new DistributedActorTable<string>("User", Context.ClusterActorDiscovery, null, null)),
                 "UserTable");
             return Task.FromResult(true);
         }
@@ -47,18 +47,18 @@ namespace TalkServer
         {
             await _userTable.GracefulStop(
                 TimeSpan.FromMinutes(1),
-                new DistributedActorTableMessage<long>.GracefulStop(InterfacedPoisonPill.Instance));
+                new DistributedActorTableMessage<string>.GracefulStop(InterfacedPoisonPill.Instance));
         }
     }
 
-    public class UserPoolWorker : ClusterRoleWorker
+    public class UserWorker : ClusterRoleWorker
     {
         private IActorRef _userContainer;
         private ChannelType _channelType;
         private IPEndPoint _listenEndPoint;
         private GatewayRef _gateway;
 
-        public UserPoolWorker(ClusterNodeContext context, ChannelType channelType, IPEndPoint listenEndPoint)
+        public UserWorker(ClusterNodeContext context, ChannelType channelType, IPEndPoint listenEndPoint)
             : base(context)
         {
             _channelType = channelType;
@@ -70,7 +70,7 @@ namespace TalkServer
             // create UserTableContainer
 
             _userContainer = Context.System.ActorOf(
-                Props.Create(() => new DistributedActorTableContainer<long>("User", Context.ClusterActorDiscovery, null, null)),
+                Props.Create(() => new DistributedActorTableContainer<string>("User", Context.ClusterActorDiscovery, null, null)),
                 "UserTableContainer");
             Context.UserTableContainer = _userContainer;
 
@@ -125,7 +125,7 @@ namespace TalkServer
         public override Task Start()
         {
             _roomTable = Context.System.ActorOf(
-                Props.Create(() => new DistributedActorTable<long>("Room", Context.ClusterActorDiscovery, null, null)),
+                Props.Create(() => new DistributedActorTable<string>("Room", Context.ClusterActorDiscovery, null, null)),
                 "RoomTable");
             return Task.FromResult(true);
         }
@@ -139,11 +139,11 @@ namespace TalkServer
         }
     }
 
-    public class RoomPoolWorker : ClusterRoleWorker
+    public class RoomWorker : ClusterRoleWorker
     {
         private IActorRef _roomContainer;
 
-        public RoomPoolWorker(ClusterNodeContext context)
+        public RoomWorker(ClusterNodeContext context)
             : base(context)
         {
         }

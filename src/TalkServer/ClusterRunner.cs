@@ -67,7 +67,7 @@ namespace TalkServer
                         break;
 
                     case "user":
-                        worker = new UserPoolWorker(context, ChannelType.Tcp, new IPEndPoint(IPAddress.Any, clientPort));
+                        worker = new UserWorker(context, ChannelType.Tcp, new IPEndPoint(IPAddress.Any, clientPort));
                         break;
 
                     case "room-table":
@@ -75,7 +75,7 @@ namespace TalkServer
                         break;
 
                     case "room":
-                        worker = new RoomPoolWorker(context);
+                        worker = new RoomWorker(context);
                         break;
 
                     case "bot":
