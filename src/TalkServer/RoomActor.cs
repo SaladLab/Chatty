@@ -18,7 +18,7 @@ namespace TalkServer
     {
         private class UserData
         {
-            // public UserRef UserActor;
+            public DateTime EnterTime;
             public RoomObserver Observer;
         }
 
@@ -102,7 +102,7 @@ namespace TalkServer
 
             _userMap[userId] = new UserData
             {
-                // UserActor = new UserRef(Sender, this, null),
+                EnterTime = DateTime.UtcNow,
                 Observer = (RoomObserver)observer
             };
 
@@ -125,8 +125,8 @@ namespace TalkServer
 
             if (_userMap.Count == 0)
             {
-                // Leave 가 되어 RoomDirectory 에서 삭제가 되어야 하기 직전에
-                // 유저가 들어올 수 있어서 이를 flag 로 가드.
+                // Because Enter could be invoked between this Exit and PoisonPill,
+                // _removed is used for preventing user from entering the room which is stopping.
 
                 _removed = true;
 

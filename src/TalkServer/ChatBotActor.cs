@@ -4,12 +4,12 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Cluster.Utility;
 using Akka.Interfaced;
+using Akka.Interfaced.SlimServer;
 using Common.Logging;
 using Domain;
 
 namespace TalkServer
 {
-    /*
     public static class ChatBotMessage
     {
         public class Start
@@ -23,7 +23,7 @@ namespace TalkServer
         }
     }
 
-    public class ChatBotActor : InterfacedActor, IExtendedInterface<IUserEventObserver, IRoomObserver>
+    public class ChatBotActor : InterfacedActor, IActorBoundChannelSync, IExtendedInterface<IUserEventObserver, IRoomObserver>
     {
         private readonly ILog _log;
         private readonly ClusterNodeContext _clusterContext;
@@ -48,7 +48,7 @@ namespace TalkServer
 
             // login by itself
 
-            var userLogin = Context.ActorOf(Props.Create(() => new UserLoginActor(_clusterContext, Self, new IPEndPoint(IPAddress.Loopback, 0))))
+            var userLogin = Context.ActorOf(Props.Create(() => new UserLoginActor(_clusterContext, Self.Cast<ActorBoundChannelRef>(), new IPEndPoint(IPAddress.Loopback, 0))))
                                    .Cast<UserLoginRef>().WithRequestWaiter(this);
             await userLogin.Login(_userId, m.UserId, CreateObserver<IUserEventObserver>());
 
@@ -68,9 +68,8 @@ namespace TalkServer
 
             await _user.ExitFromRoom(m.RoomName);
 
-            _user.Actor.Tell(new ActorBoundSessionMessage.SessionTerminated());
-
-            Context.Stop(Self);
+            _user.CastToIActorRef().Tell(InterfacedPoisonPill.Instance);
+            Self.Tell(InterfacedPoisonPill.Instance);
         }
 
         [MessageHandler]
@@ -79,25 +78,59 @@ namespace TalkServer
             _stopped = true;
         }
 
-        [MessageHandler]
-        private void Handle(ActorBoundSessionMessage.Bind m)
+        InterfacedActorRef IActorBoundChannelSync.BindActor(InterfacedActorRef actor, ActorBindingFlags bindingFlags)
         {
-            if (m.InterfaceType == typeof(IUser))
+            var targetActor = ((AkkaActorTarget)actor.Target).Actor;
+
+            var boundActor = ((IActorBoundChannelSync)this).BindActor(targetActor, new TaggedType[] { actor.InterfaceType }, bindingFlags);
+            if (boundActor == null)
+                return null;
+
+            var actorRef = (InterfacedActorRef)Activator.CreateInstance(actor.GetType());
+            InterfacedActorRefModifier.SetTarget(actorRef, boundActor);
+            return actorRef;
+        }
+
+        BoundActorTarget IActorBoundChannelSync.BindActor(IActorRef actor, TaggedType[] types, ActorBindingFlags bindingFlags)
+        {
+            // this actor doesn't work as a normal channel.
+            // it just hooks binding event and save those actors to use later.
+
+            if (types[0].Type == typeof(IUser))
             {
-                _user = new UserRef(m.Actor, this, null);
-                Sender.Tell(new ActorBoundSessionMessage.BindReply(1));
-                return;
+                _user = actor.Cast<UserRef>().WithRequestWaiter(this);
+                return new BoundActorTarget(0);
             }
 
-            if (m.InterfaceType == typeof(IOccupant))
+            if (types[0].Type == typeof(IOccupant))
             {
-                _occupant = new OccupantRef(m.Actor, this, null);
-                Sender.Tell(new ActorBoundSessionMessage.BindReply(1));
-                return;
+                _occupant = actor.Cast<OccupantRef>().WithRequestWaiter(this);
+                return new BoundActorTarget(0);
             }
 
             _log.ErrorFormat("Unexpected bind type. (InterfaceType={0}, Actor={1})",
-                             m.InterfaceType?.FullName, m.Actor);
+                             types[0].Type.FullName, actor);
+            return null;
+        }
+
+        bool IActorBoundChannelSync.UnbindActor(IActorRef actor)
+        {
+            return true;
+        }
+
+        bool IActorBoundChannelSync.BindType(IActorRef actor, TaggedType[] types)
+        {
+            return true;
+        }
+
+        bool IActorBoundChannelSync.UnbindType(IActorRef actor, Type[] types)
+        {
+            return true;
+        }
+
+        void IActorBoundChannelSync.Close()
+        {
+            Self.Tell(InterfacedPoisonPill.Instance);
         }
 
         private async Task SayAsync(string message)
@@ -157,5 +190,4 @@ namespace TalkServer
                 await SayAsync($"Yes I'm a bot.");
         }
     }
-    */
 }

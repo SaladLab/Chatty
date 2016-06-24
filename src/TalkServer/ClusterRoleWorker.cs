@@ -76,38 +76,44 @@ namespace TalkServer
 
             // create gateway for users to connect to
 
-            var serializer = PacketSerializer.CreatePacketSerializer();
-
-            var initiator = new GatewayInitiator
+            if (_listenEndPoint.Port != 0)
             {
-                ListenEndPoint = _listenEndPoint,
-                GatewayLogger = LogManager.GetLogger($"Gateway({_channelType})"),
-                CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
-                ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
-                PacketSerializer = serializer,
-                CreateInitialActors = (context, connection) => new[]
+                var serializer = PacketSerializer.CreatePacketSerializer();
+
+                var initiator = new GatewayInitiator
                 {
+                    ListenEndPoint = _listenEndPoint,
+                    GatewayLogger = LogManager.GetLogger($"Gateway({_channelType})"),
+                    CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
+                    ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
+                    PacketSerializer = serializer,
+                    CreateInitialActors = (context, connection) => new[]
+                    {
                     Tuple.Create(
                         context.ActorOf(Props.Create(() =>
                             new UserLoginActor(Context, context.Self.Cast<ActorBoundChannelRef>(), GatewayInitiator.GetRemoteEndPoint(connection)))),
                         new TaggedType[] { typeof(IUserLogin) },
                         (ActorBindingFlags)0)
                 }
-            };
+                };
 
-            var gateway = (_channelType == ChannelType.Tcp)
-                ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), "TcpGateway").Cast<GatewayRef>()
-                : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), "UdpGateway").Cast<GatewayRef>();
+                var gateway = (_channelType == ChannelType.Tcp)
+                    ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), "TcpGateway").Cast<GatewayRef>()
+                    : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), "UdpGateway").Cast<GatewayRef>();
 
-            await gateway.Start();
+                await gateway.Start();
 
-            _gateway = gateway;
+                _gateway = gateway;
+            }
         }
 
         public override async Task Stop()
         {
-            await _gateway.Stop();
-            await _gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
+            if (_gateway != null)
+            {
+                await _gateway.Stop();
+                await _gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
+            }
 
             await _userContainer.GracefulStop(TimeSpan.FromSeconds(10), PoisonPill.Instance);
         }
@@ -179,6 +185,32 @@ namespace TalkServer
         public IActorRef CreateActor(IActorRefFactory actorRefFactory, object id, object[] args)
         {
             return actorRefFactory.ActorOf(Props.Create(() => new RoomActor(_clusterContext, (string)id)));
+        }
+    }
+
+    public class BotWorker : ClusterRoleWorker
+    {
+        private IActorRef _botCommander;
+
+        public BotWorker(ClusterNodeContext context)
+            : base(context)
+        {
+        }
+
+        public override Task Start()
+        {
+            // create commander actor
+
+            _botCommander = Context.System.ActorOf(
+                Props.Create(() => new ChatBotCommanderActor(Context)), "ChatBotCommander");
+            _botCommander.Tell(new ChatBotCommanderMessage.Start());
+
+            return Task.FromResult(true);
+        }
+
+        public override async Task Stop()
+        {
+            await _botCommander.GracefulStop(TimeSpan.FromSeconds(10), new ChatBotCommanderMessage.Stop());
         }
     }
 }

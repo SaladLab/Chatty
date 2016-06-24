@@ -79,9 +79,8 @@ namespace TalkServer
                         break;
 
                     case "bot":
-                    case "bot-user":
-                        // TODO: UGE
-                        continue;
+                        worker = new BotWorker(context);
+                        break;
 
                     default:
                         throw new InvalidOperationException("Invalid role: " + role);

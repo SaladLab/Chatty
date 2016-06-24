@@ -6,7 +6,6 @@ using Common.Logging;
 
 namespace TalkServer
 {
-    /*
     public class ChatBotCommanderMessage
     {
         public class Start
@@ -33,7 +32,7 @@ namespace TalkServer
         [MessageHandler]
         private void Handle(ChatBotCommanderMessage.Start m)
         {
-            // waits for a while until system is fully initailized.
+            // waits for a while until system is fully initialized.
 
             if (_clusterContext.UserTable == null ||
                 _clusterContext.RoomTable == null)
@@ -59,7 +58,7 @@ namespace TalkServer
             _logger.Info("Stop");
             _isStopped = true;
 
-            // stop all running client sessions
+            // stop all running bots
 
             if (_botSet.Count > 0)
             {
@@ -67,7 +66,7 @@ namespace TalkServer
             }
             else
             {
-                Context.Stop(Self);
+                Self.Tell(InterfacedPoisonPill.Instance);
             }
         }
 
@@ -77,8 +76,7 @@ namespace TalkServer
             _botSet.Remove(m.ActorRef);
 
             if (_isStopped && _botSet.Count == 0)
-                Context.Stop(Self);
+                Self.Tell(InterfacedPoisonPill.Instance);
         }
     }
-    */
 }

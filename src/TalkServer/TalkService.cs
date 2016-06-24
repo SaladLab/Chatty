@@ -45,7 +45,7 @@ namespace TalkServer
                 await clusterRunner.LaunchNode(3012, 0, "room");
                 await clusterRunner.LaunchNode(3021, 9001, "user");
                 await clusterRunner.LaunchNode(3022, 9002, "user");
-                await clusterRunner.LaunchNode(3031, 0, "bot-user");
+                await clusterRunner.LaunchNode(3031, 0, "bot", "user");
             }
 
             try
