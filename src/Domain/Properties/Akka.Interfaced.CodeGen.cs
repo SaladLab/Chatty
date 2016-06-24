@@ -126,15 +126,17 @@ namespace Domain
 
     public class OccupantRef : InterfacedActorRef, IOccupant, IOccupant_NoReply
     {
+        public override Type InterfaceType => typeof(IOccupant);
+
         public OccupantRef() : base(null)
         {
         }
 
-        public OccupantRef(IActorRef actor) : base(actor)
+        public OccupantRef(IRequestTarget target) : base(target)
         {
         }
 
-        public OccupantRef(IActorRef actor, IRequestWaiter requestWaiter, TimeSpan? timeout) : base(actor, requestWaiter, timeout)
+        public OccupantRef(IRequestTarget target, IRequestWaiter requestWaiter, TimeSpan? timeout = null) : base(target, requestWaiter, timeout)
         {
         }
 
@@ -145,12 +147,12 @@ namespace Domain
 
         public OccupantRef WithRequestWaiter(IRequestWaiter requestWaiter)
         {
-            return new OccupantRef(Actor, requestWaiter, Timeout);
+            return new OccupantRef(Target, requestWaiter, Timeout);
         }
 
         public OccupantRef WithTimeout(TimeSpan? timeout)
         {
-            return new OccupantRef(Actor, RequestWaiter, timeout);
+            return new OccupantRef(Target, RequestWaiter, timeout);
         }
 
         public Task<System.Collections.Generic.List<Domain.ChatItem>> GetHistory()
@@ -205,21 +207,29 @@ namespace Domain
     [ProtoContract]
     public class SurrogateForIOccupant
     {
-        [ProtoMember(1)] public IActorRef Actor;
+        [ProtoMember(1)] public IRequestTarget Target;
 
         [ProtoConverter]
         public static SurrogateForIOccupant Convert(IOccupant value)
         {
             if (value == null) return null;
-            return new SurrogateForIOccupant { Actor = ((OccupantRef)value).Actor };
+            return new SurrogateForIOccupant { Target = ((OccupantRef)value).Target };
         }
 
         [ProtoConverter]
         public static IOccupant Convert(SurrogateForIOccupant value)
         {
             if (value == null) return null;
-            return new OccupantRef(value.Actor);
+            return new OccupantRef(value.Target);
         }
+    }
+
+    [AlternativeInterface(typeof(IOccupant))]
+    public interface IOccupantSync : IInterfacedActorSync
+    {
+        System.Collections.Generic.List<Domain.ChatItem> GetHistory();
+        void Invite(System.String targetUserId, System.String senderUserId = null);
+        void Say(System.String msg, System.String senderUserId = null);
     }
 }
 
@@ -310,15 +320,17 @@ namespace Domain
 
     public class RoomRef : InterfacedActorRef, IRoom, IRoom_NoReply
     {
+        public override Type InterfaceType => typeof(IRoom);
+
         public RoomRef() : base(null)
         {
         }
 
-        public RoomRef(IActorRef actor) : base(actor)
+        public RoomRef(IRequestTarget target) : base(target)
         {
         }
 
-        public RoomRef(IActorRef actor, IRequestWaiter requestWaiter, TimeSpan? timeout) : base(actor, requestWaiter, timeout)
+        public RoomRef(IRequestTarget target, IRequestWaiter requestWaiter, TimeSpan? timeout = null) : base(target, requestWaiter, timeout)
         {
         }
 
@@ -329,18 +341,18 @@ namespace Domain
 
         public RoomRef WithRequestWaiter(IRequestWaiter requestWaiter)
         {
-            return new RoomRef(Actor, requestWaiter, Timeout);
+            return new RoomRef(Target, requestWaiter, Timeout);
         }
 
         public RoomRef WithTimeout(TimeSpan? timeout)
         {
-            return new RoomRef(Actor, RequestWaiter, timeout);
+            return new RoomRef(Target, RequestWaiter, timeout);
         }
 
         public Task<Domain.RoomInfo> Enter(System.String userId, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IRoom_PayloadTable.Enter_Invoke { userId = userId, observer = observer }
+                InvokePayload = new IRoom_PayloadTable.Enter_Invoke { userId = userId, observer = (RoomObserver)observer }
             };
             return SendRequestAndReceive<Domain.RoomInfo>(requestMessage);
         }
@@ -356,7 +368,7 @@ namespace Domain
         void IRoom_NoReply.Enter(System.String userId, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IRoom_PayloadTable.Enter_Invoke { userId = userId, observer = observer }
+                InvokePayload = new IRoom_PayloadTable.Enter_Invoke { userId = userId, observer = (RoomObserver)observer }
             };
             SendRequest(requestMessage);
         }
@@ -373,21 +385,28 @@ namespace Domain
     [ProtoContract]
     public class SurrogateForIRoom
     {
-        [ProtoMember(1)] public IActorRef Actor;
+        [ProtoMember(1)] public IRequestTarget Target;
 
         [ProtoConverter]
         public static SurrogateForIRoom Convert(IRoom value)
         {
             if (value == null) return null;
-            return new SurrogateForIRoom { Actor = ((RoomRef)value).Actor };
+            return new SurrogateForIRoom { Target = ((RoomRef)value).Target };
         }
 
         [ProtoConverter]
         public static IRoom Convert(SurrogateForIRoom value)
         {
             if (value == null) return null;
-            return new RoomRef(value.Actor);
+            return new RoomRef(value.Target);
         }
+    }
+
+    [AlternativeInterface(typeof(IRoom))]
+    public interface IRoomSync : IInterfacedActorSync
+    {
+        Domain.RoomInfo Enter(System.String userId, Domain.IRoomObserver observer);
+        void Exit(System.String userId);
     }
 }
 
@@ -577,15 +596,17 @@ namespace Domain
 
     public class UserRef : InterfacedActorRef, IUser, IUser_NoReply
     {
+        public override Type InterfaceType => typeof(IUser);
+
         public UserRef() : base(null)
         {
         }
 
-        public UserRef(IActorRef actor) : base(actor)
+        public UserRef(IRequestTarget target) : base(target)
         {
         }
 
-        public UserRef(IActorRef actor, IRequestWaiter requestWaiter, TimeSpan? timeout) : base(actor, requestWaiter, timeout)
+        public UserRef(IRequestTarget target, IRequestWaiter requestWaiter, TimeSpan? timeout = null) : base(target, requestWaiter, timeout)
         {
         }
 
@@ -596,18 +617,18 @@ namespace Domain
 
         public UserRef WithRequestWaiter(IRequestWaiter requestWaiter)
         {
-            return new UserRef(Actor, requestWaiter, Timeout);
+            return new UserRef(Target, requestWaiter, Timeout);
         }
 
         public UserRef WithTimeout(TimeSpan? timeout)
         {
-            return new UserRef(Actor, RequestWaiter, timeout);
+            return new UserRef(Target, RequestWaiter, timeout);
         }
 
         public Task<System.Tuple<Domain.IOccupant, Domain.RoomInfo>> EnterRoom(System.String name, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observer = observer }
+                InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observer = (RoomObserver)observer }
             };
             return SendRequestAndReceive<System.Tuple<Domain.IOccupant, Domain.RoomInfo>>(requestMessage);
         }
@@ -647,7 +668,7 @@ namespace Domain
         void IUser_NoReply.EnterRoom(System.String name, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observer = observer }
+                InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observer = (RoomObserver)observer }
             };
             SendRequest(requestMessage);
         }
@@ -688,21 +709,31 @@ namespace Domain
     [ProtoContract]
     public class SurrogateForIUser
     {
-        [ProtoMember(1)] public IActorRef Actor;
+        [ProtoMember(1)] public IRequestTarget Target;
 
         [ProtoConverter]
         public static SurrogateForIUser Convert(IUser value)
         {
             if (value == null) return null;
-            return new SurrogateForIUser { Actor = ((UserRef)value).Actor };
+            return new SurrogateForIUser { Target = ((UserRef)value).Target };
         }
 
         [ProtoConverter]
         public static IUser Convert(SurrogateForIUser value)
         {
             if (value == null) return null;
-            return new UserRef(value.Actor);
+            return new UserRef(value.Target);
         }
+    }
+
+    [AlternativeInterface(typeof(IUser))]
+    public interface IUserSync : IInterfacedActorSync
+    {
+        System.Tuple<Domain.IOccupant, Domain.RoomInfo> EnterRoom(System.String name, Domain.IRoomObserver observer);
+        void ExitFromRoom(System.String name);
+        System.String GetId();
+        System.Collections.Generic.List<System.String> GetRoomList();
+        void Whisper(System.String targetUserId, System.String message);
     }
 }
 
@@ -782,15 +813,17 @@ namespace Domain
 
     public class UserLoginRef : InterfacedActorRef, IUserLogin, IUserLogin_NoReply
     {
+        public override Type InterfaceType => typeof(IUserLogin);
+
         public UserLoginRef() : base(null)
         {
         }
 
-        public UserLoginRef(IActorRef actor) : base(actor)
+        public UserLoginRef(IRequestTarget target) : base(target)
         {
         }
 
-        public UserLoginRef(IActorRef actor, IRequestWaiter requestWaiter, TimeSpan? timeout) : base(actor, requestWaiter, timeout)
+        public UserLoginRef(IRequestTarget target, IRequestWaiter requestWaiter, TimeSpan? timeout = null) : base(target, requestWaiter, timeout)
         {
         }
 
@@ -801,18 +834,18 @@ namespace Domain
 
         public UserLoginRef WithRequestWaiter(IRequestWaiter requestWaiter)
         {
-            return new UserLoginRef(Actor, requestWaiter, Timeout);
+            return new UserLoginRef(Target, requestWaiter, Timeout);
         }
 
         public UserLoginRef WithTimeout(TimeSpan? timeout)
         {
-            return new UserLoginRef(Actor, RequestWaiter, timeout);
+            return new UserLoginRef(Target, RequestWaiter, timeout);
         }
 
         public Task<Domain.IUser> Login(System.String id, System.String password, Domain.IUserEventObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observer = observer }
+                InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observer = (UserEventObserver)observer }
             };
             return SendRequestAndReceive<Domain.IUser>(requestMessage);
         }
@@ -820,7 +853,7 @@ namespace Domain
         void IUserLogin_NoReply.Login(System.String id, System.String password, Domain.IUserEventObserver observer)
         {
             var requestMessage = new RequestMessage {
-                InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observer = observer }
+                InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observer = (UserEventObserver)observer }
             };
             SendRequest(requestMessage);
         }
@@ -829,21 +862,27 @@ namespace Domain
     [ProtoContract]
     public class SurrogateForIUserLogin
     {
-        [ProtoMember(1)] public IActorRef Actor;
+        [ProtoMember(1)] public IRequestTarget Target;
 
         [ProtoConverter]
         public static SurrogateForIUserLogin Convert(IUserLogin value)
         {
             if (value == null) return null;
-            return new SurrogateForIUserLogin { Actor = ((UserLoginRef)value).Actor };
+            return new SurrogateForIUserLogin { Target = ((UserLoginRef)value).Target };
         }
 
         [ProtoConverter]
         public static IUserLogin Convert(SurrogateForIUserLogin value)
         {
             if (value == null) return null;
-            return new UserLoginRef(value.Actor);
+            return new UserLoginRef(value.Target);
         }
+    }
+
+    [AlternativeInterface(typeof(IUserLogin))]
+    public interface IUserLoginSync : IInterfacedActorSync
+    {
+        Domain.IUser Login(System.String id, System.String password, Domain.IUserEventObserver observer);
     }
 }
 
@@ -909,15 +948,17 @@ namespace Domain
 
     public class UserMessasingRef : InterfacedActorRef, IUserMessasing, IUserMessasing_NoReply
     {
+        public override Type InterfaceType => typeof(IUserMessasing);
+
         public UserMessasingRef() : base(null)
         {
         }
 
-        public UserMessasingRef(IActorRef actor) : base(actor)
+        public UserMessasingRef(IRequestTarget target) : base(target)
         {
         }
 
-        public UserMessasingRef(IActorRef actor, IRequestWaiter requestWaiter, TimeSpan? timeout) : base(actor, requestWaiter, timeout)
+        public UserMessasingRef(IRequestTarget target, IRequestWaiter requestWaiter, TimeSpan? timeout = null) : base(target, requestWaiter, timeout)
         {
         }
 
@@ -928,12 +969,12 @@ namespace Domain
 
         public UserMessasingRef WithRequestWaiter(IRequestWaiter requestWaiter)
         {
-            return new UserMessasingRef(Actor, requestWaiter, Timeout);
+            return new UserMessasingRef(Target, requestWaiter, Timeout);
         }
 
         public UserMessasingRef WithTimeout(TimeSpan? timeout)
         {
-            return new UserMessasingRef(Actor, RequestWaiter, timeout);
+            return new UserMessasingRef(Target, RequestWaiter, timeout);
         }
 
         public Task Invite(System.String invitorUserId, System.String roomName)
@@ -972,21 +1013,28 @@ namespace Domain
     [ProtoContract]
     public class SurrogateForIUserMessasing
     {
-        [ProtoMember(1)] public IActorRef Actor;
+        [ProtoMember(1)] public IRequestTarget Target;
 
         [ProtoConverter]
         public static SurrogateForIUserMessasing Convert(IUserMessasing value)
         {
             if (value == null) return null;
-            return new SurrogateForIUserMessasing { Actor = ((UserMessasingRef)value).Actor };
+            return new SurrogateForIUserMessasing { Target = ((UserMessasingRef)value).Target };
         }
 
         [ProtoConverter]
         public static IUserMessasing Convert(SurrogateForIUserMessasing value)
         {
             if (value == null) return null;
-            return new UserMessasingRef(value.Actor);
+            return new UserMessasingRef(value.Target);
         }
+    }
+
+    [AlternativeInterface(typeof(IUserMessasing))]
+    public interface IUserMessasingSync : IInterfacedActorSync
+    {
+        void Invite(System.String invitorUserId, System.String roomName);
+        void Whisper(Domain.ChatItem chatItem);
     }
 }
 
@@ -1068,11 +1116,6 @@ namespace Domain
         {
         }
 
-        public RoomObserver(IActorRef target, int observerId = 0)
-            : base(new ActorNotificationChannel(target), observerId)
-        {
-        }
-
         public void Enter(System.String userId)
         {
             var payload = new IRoomObserver_PayloadTable.Enter_Invoke { userId = userId };
@@ -1112,6 +1155,14 @@ namespace Domain
             if (value == null) return null;
             return new RoomObserver(value.Channel, value.ObserverId);
         }
+    }
+
+    [AlternativeInterface(typeof(IRoomObserver))]
+    public interface IRoomObserverAsync : IInterfacedObserverSync
+    {
+        Task Enter(System.String userId);
+        Task Exit(System.String userId);
+        Task Say(Domain.ChatItem chatItem);
     }
 }
 
@@ -1177,11 +1228,6 @@ namespace Domain
         {
         }
 
-        public UserEventObserver(IActorRef target, int observerId = 0)
-            : base(new ActorNotificationChannel(target), observerId)
-        {
-        }
-
         public void Invite(System.String invitorUserId, System.String roomName)
         {
             var payload = new IUserEventObserver_PayloadTable.Invite_Invoke { invitorUserId = invitorUserId, roomName = roomName };
@@ -1215,6 +1261,13 @@ namespace Domain
             if (value == null) return null;
             return new UserEventObserver(value.Channel, value.ObserverId);
         }
+    }
+
+    [AlternativeInterface(typeof(IUserEventObserver))]
+    public interface IUserEventObserverAsync : IInterfacedObserverSync
+    {
+        Task Invite(System.String invitorUserId, System.String roomName);
+        Task Whisper(Domain.ChatItem chatItem);
     }
 }
 
