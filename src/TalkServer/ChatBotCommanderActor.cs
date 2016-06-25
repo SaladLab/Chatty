@@ -44,7 +44,7 @@ namespace TalkServer
             // make one bot
 
             var chatBot = Context.ActorOf(Props.Create(() => new ChatBotActor(_clusterContext, "bot1")));
-            chatBot.Tell(new ChatBotMessage.Start { UserId = "bot1", RoomName = "#bot" });
+            chatBot.Tell(new ChatBotMessage.Start { UserId = "bot1", RoomName = "#bot", PatternType = typeof(DummyBot) });
             Context.Watch(chatBot);
             _botSet.Add(chatBot);
         }
