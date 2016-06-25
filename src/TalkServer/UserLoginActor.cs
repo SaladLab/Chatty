@@ -43,7 +43,7 @@ namespace TalkServer
             IActorRef user;
             try
             {
-                user = Context.ActorOf(
+                user = Context.System.ActorOf(
                     Props.Create(() => new UserActor(_clusterContext, _channel, id, observer)),
                     "user_" + id);
             }
@@ -74,11 +74,13 @@ namespace TalkServer
 
             // Bind user actor to channel, which makes client to communicate with this actor.
 
-            var boundActor = await _channel.BindActor(user.Cast<UserRef>(), ActorBindingFlags.StopThenCloseChannel);
+            var boundActor = await _channel.BindActor(
+                user.Cast<UserRef>(),
+                ActorBindingFlags.CloseThenStop | ActorBindingFlags.StopThenCloseChannel);
             if (boundActor != null)
             {
                 // After login successfully, stop this
-                // TODO: ERROR! Self.Tell(InterfacedPoisonPill.Instance);
+                Self.Tell(InterfacedPoisonPill.Instance);
                 return boundActor.Cast<UserRef>();
             }
             else
