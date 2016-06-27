@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
-using Akka.Interfaced;
 using ProtoBuf;
 using TypeAlias;
 
@@ -11,15 +9,15 @@ namespace Domain
         None = 0,
         ArgumentError = 1,
         InternalError = 2,
-        LoginFailedNoUser = 3,
-        LoginFailedIncorrectPassword = 4,
-        LoginFailedAlreadyConnected = 5,
-        NeedToBeInRoom = 6,
-        NeedToBeOutOfRoom = 7,
-        RoomRemoved = 8,
-        UserNotMyself = 9,
-        UserNotOnline = 10,
-        UserAlreadyHere = 11
+        LoginFailedNoUser = 10,
+        LoginFailedIncorrectPassword,
+        LoginFailedAlreadyConnected,
+        NeedToBeInRoom = 20,
+        NeedToBeOutOfRoom,
+        RoomRemoved,
+        UserNotMyself,
+        UserNotOnline,
+        UserAlreadyHere
     }
 
     [ProtoContract, TypeAlias]

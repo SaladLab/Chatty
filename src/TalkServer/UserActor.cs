@@ -77,12 +77,16 @@ namespace TalkServer
 
             var info = await room.Enter(_id, observer);
 
-            // Bind an occupant actor to channel
+            // Bind an room actor to channel
 
             var boundActor = await _channel.BindActor(room.CastToIActorRef(),
                                                       new[] { new TaggedType(typeof(IOccupant), _id) });
             if (boundActor == null)
+            {
+                await room.Exit(_id);
+                _logger.Error($"Failed in binding Occupant");
                 throw new ResultException(ResultCodeType.InternalError);
+            }
 
             _enteredRoomMap[name] = room;
             return Tuple.Create((IOccupant)boundActor.Cast<OccupantRef>(), info);
@@ -101,7 +105,7 @@ namespace TalkServer
 
             await room.Exit(_id);
 
-            // Unbind an occupant actor from channel
+            // Unbind an room actor from channel
 
             _channel.WithNoReply().UnbindActor(room.CastToIActorRef());
 

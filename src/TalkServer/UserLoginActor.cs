@@ -77,16 +77,17 @@ namespace TalkServer
             var boundActor = await _channel.BindActor(
                 user.Cast<UserRef>(),
                 ActorBindingFlags.CloseThenStop | ActorBindingFlags.StopThenCloseChannel);
-            if (boundActor != null)
+            if (boundActor == null)
             {
-                // After login successfully, stop this
-                Self.Tell(InterfacedPoisonPill.Instance);
-                return boundActor.Cast<UserRef>();
+                user.Tell(InterfacedPoisonPill.Instance);
+                _logger.Error($"Failed in binding UserActor({id}");
+                throw new ResultException(ResultCodeType.InternalError);
             }
-            else
-            {
-                return null;
-            }
+
+            // After login successfully, stop this
+            Self.Tell(InterfacedPoisonPill.Instance);
+
+            return boundActor.Cast<UserRef>();
         }
     }
 }

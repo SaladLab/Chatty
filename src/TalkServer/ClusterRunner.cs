@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Cluster;
@@ -10,11 +9,6 @@ using Akka.Cluster.Utility;
 using Akka.Configuration;
 using Akka.Interfaced;
 using Akka.Interfaced.SlimSocket;
-using Akka.Interfaced.SlimSocket.Server;
-using Common.Logging;
-using ProtoBuf.Meta;
-using TypeAlias;
-using Domain;
 
 namespace TalkServer
 {
