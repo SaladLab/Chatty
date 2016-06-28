@@ -1,20 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
+using System.Reflection;
 using Akka.Actor;
 using Akka.Cluster;
 using Akka.Cluster.Utility;
 using Akka.Configuration;
+using Akka.Configuration.Hocon;
 using Akka.Interfaced;
-using Akka.Interfaced.SlimSocket;
 
 namespace TalkServer
 {
     public class ClusterRunner
     {
         private readonly Config _commonConfig;
+        private readonly Dictionary<string, Type> _roleToTypeMap;
 
         public class Node
         {
@@ -24,20 +25,72 @@ namespace TalkServer
 
         private readonly List<Node> _nodes = new List<Node>();
 
-        public ClusterRunner(Config commonConfig)
+        public ClusterRunner(Config commonConfig, IEnumerable<Assembly> assemblies = null)
         {
             _commonConfig = commonConfig;
+            _roleToTypeMap = CollectRoleWorkerTypes(assemblies);
         }
 
-        public async Task LaunchNode(int port, int clientPort, params string[] roles)
+        private Dictionary<string, Type> CollectRoleWorkerTypes(IEnumerable<Assembly> assemblies)
+        {
+            var map = new Dictionary<string, Type>();
+            var asms = assemblies ?? AppDomain.CurrentDomain.GetAssemblies();
+            foreach (var asm in asms)
+            {
+                foreach (var type in asm.GetTypes())
+                {
+                    var attr = type.GetCustomAttribute<RoleWorkerAttribute>();
+                    if (attr != null)
+                        map.Add(attr.Role, type);
+                }
+            }
+            return map;
+        }
+
+        public async Task Launch(IList<HoconValue> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                var port = node.GetChildObject("port").GetInt();
+                var roles = ResolveRoles(node.GetChildObject("roles").GetArray()).ToList();
+                await LaunchNode(port, roles);
+            }
+        }
+
+        private IEnumerable<Tuple<string, Type, HoconObject>> ResolveRoles(IList<HoconValue> roles)
+        {
+            foreach (var role in roles)
+            {
+                var arr = role.GetArray();
+                if (arr.Count == 0)
+                {
+                    // "Role"
+                    var id = role.GetString();
+                    var type = _roleToTypeMap[id];
+                    yield return Tuple.Create(id, type, new HoconObject());
+                }
+                else
+                {
+                    // [ "Role", { config } ]
+                    var id = arr[0].GetString();
+                    var type = _roleToTypeMap[id];
+                    var config = arr[1].GetObject();
+                    yield return Tuple.Create(id, type, config);
+                }
+            }
+        }
+
+        public async Task LaunchNode(int port, IEnumerable<Tuple<string, Type, HoconObject>> roles)
         {
             // setup system
 
-            var config = _commonConfig
+            var config = Config.Empty
                 .WithFallback("akka.remote.helios.tcp.port = " + port)
-                .WithFallback("akka.cluster.roles = " + "[" + string.Join(",", roles) + "]");
+                .WithFallback("akka.cluster.roles = " + "[" + string.Join(",", roles.Select(r => r.Item1)) + "]")
+                .WithFallback(_commonConfig);
 
-            var system = ActorSystem.Create("ChatCluster", config);
+            var name = config.GetValue("system.name").GetString();
+            var system = ActorSystem.Create(name, config);
             DeadRequestProcessingActor.Install(system);
 
             // configure cluster base utilities
@@ -53,32 +106,7 @@ namespace TalkServer
             var workers = new List<ClusterRoleWorker>();
             foreach (var role in roles)
             {
-                ClusterRoleWorker worker;
-                switch (role)
-                {
-                    case "user-table":
-                        worker = new UserTableWorker(context);
-                        break;
-
-                    case "user":
-                        worker = new UserWorker(context, ChannelType.Tcp, new IPEndPoint(IPAddress.Any, clientPort));
-                        break;
-
-                    case "room-table":
-                        worker = new RoomTableWorker(context);
-                        break;
-
-                    case "room":
-                        worker = new RoomWorker(context);
-                        break;
-
-                    case "bot":
-                        worker = new BotWorker(context);
-                        break;
-
-                    default:
-                        throw new InvalidOperationException("Invalid role: " + role);
-                }
+                var worker = (ClusterRoleWorker)Activator.CreateInstance(role.Item2, context, role.Item3);
                 await worker.Start();
                 workers.Add(worker);
             }

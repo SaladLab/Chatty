@@ -10,6 +10,7 @@ using Akka.Interfaced.SlimSocket;
 using Akka.Interfaced.SlimSocket.Server;
 using Common.Logging;
 using Domain;
+using Akka.Configuration.Hocon;
 
 namespace TalkServer
 {
@@ -26,11 +27,23 @@ namespace TalkServer
         public abstract Task Stop();
     }
 
+    [AttributeUsage(System.AttributeTargets.Class)]
+    public class RoleWorkerAttribute : Attribute
+    {
+        public string Role { get; set; }
+
+        public RoleWorkerAttribute(string role)
+        {
+            Role = role;
+        }
+    }
+
+    [RoleWorker("UserTable")]
     public class UserTableWorker : ClusterRoleWorker
     {
         private IActorRef _userTable;
 
-        public UserTableWorker(ClusterNodeContext context)
+        public UserTableWorker(ClusterNodeContext context, HoconObject config)
             : base(context)
         {
         }
@@ -51,6 +64,7 @@ namespace TalkServer
         }
     }
 
+    [RoleWorker("User")]
     public class UserWorker : ClusterRoleWorker
     {
         private IActorRef _userContainer;
@@ -58,11 +72,11 @@ namespace TalkServer
         private IPEndPoint _listenEndPoint;
         private GatewayRef _gateway;
 
-        public UserWorker(ClusterNodeContext context, ChannelType channelType, IPEndPoint listenEndPoint)
+        public UserWorker(ClusterNodeContext context, HoconObject config)
             : base(context)
         {
-            _channelType = channelType;
-            _listenEndPoint = listenEndPoint;
+            _channelType = ChannelType.Tcp;
+            _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetKey("port")?.GetInt() ?? 0);
         }
 
         public override async Task Start()
@@ -119,11 +133,12 @@ namespace TalkServer
         }
     }
 
+    [RoleWorker("RoomTable")]
     public class RoomTableWorker : ClusterRoleWorker
     {
         private IActorRef _roomTable;
 
-        public RoomTableWorker(ClusterNodeContext context)
+        public RoomTableWorker(ClusterNodeContext context, HoconObject config)
             : base(context)
         {
         }
@@ -145,11 +160,12 @@ namespace TalkServer
         }
     }
 
+    [RoleWorker("Room")]
     public class RoomWorker : ClusterRoleWorker
     {
         private IActorRef _roomContainer;
 
-        public RoomWorker(ClusterNodeContext context)
+        public RoomWorker(ClusterNodeContext context, HoconObject config)
             : base(context)
         {
         }
@@ -188,11 +204,12 @@ namespace TalkServer
         }
     }
 
+    [RoleWorker("Bot")]
     public class BotWorker : ClusterRoleWorker
     {
         private IActorRef _botCommander;
 
-        public BotWorker(ClusterNodeContext context)
+        public BotWorker(ClusterNodeContext context, HoconObject config)
             : base(context)
         {
         }
