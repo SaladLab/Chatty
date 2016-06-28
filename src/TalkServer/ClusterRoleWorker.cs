@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Akka.Actor;
+using Akka.Configuration.Hocon;
 using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Akka.Interfaced.SlimServer;
@@ -10,7 +12,6 @@ using Akka.Interfaced.SlimSocket;
 using Akka.Interfaced.SlimSocket.Server;
 using Common.Logging;
 using Domain;
-using Akka.Configuration.Hocon;
 
 namespace TalkServer
 {
@@ -68,14 +69,14 @@ namespace TalkServer
     public class UserWorker : ClusterRoleWorker
     {
         private IActorRef _userContainer;
-        private ChannelType _channelType;
+        private List<ChannelType> _channelTypes;
         private IPEndPoint _listenEndPoint;
-        private GatewayRef _gateway;
+        private List<GatewayRef> _gateways;
 
         public UserWorker(ClusterNodeContext context, HoconObject config)
             : base(context)
         {
-            _channelType = ChannelType.Tcp;
+            _channelTypes = new List<ChannelType> { ChannelType.Tcp, ChannelType.Udp };
             _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetKey("port")?.GetInt() ?? 0);
         }
 
@@ -90,44 +91,53 @@ namespace TalkServer
 
             // create gateway for users to connect to
 
+            _gateways = new List<GatewayRef>();
             if (_listenEndPoint.Port != 0)
             {
                 var serializer = PacketSerializer.CreatePacketSerializer();
 
-                var initiator = new GatewayInitiator
+                foreach (var channelType in _channelTypes)
                 {
-                    ListenEndPoint = _listenEndPoint,
-                    GatewayLogger = LogManager.GetLogger($"Gateway({_channelType})"),
-                    CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
-                    ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
-                    PacketSerializer = serializer,
-                    CreateInitialActors = (context, connection) => new[]
+                    var name = $"UserGateway({channelType})";
+                    var initiator = new GatewayInitiator
                     {
-                    Tuple.Create(
-                        context.ActorOf(Props.Create(() =>
-                            new UserLoginActor(Context, context.Self.Cast<ActorBoundChannelRef>(), GatewayInitiator.GetRemoteEndPoint(connection)))),
-                        new TaggedType[] { typeof(IUserLogin) },
-                        (ActorBindingFlags)0)
+                        ListenEndPoint = _listenEndPoint,
+                        GatewayLogger = LogManager.GetLogger(name),
+                        CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
+                        ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
+                        PacketSerializer = serializer,
+                        CreateInitialActors = (context, connection) => new[]
+                        {
+                        Tuple.Create(
+                            context.ActorOf(Props.Create(() =>
+                                new UserLoginActor(Context, context.Self.Cast<ActorBoundChannelRef>(), GatewayInitiator.GetRemoteEndPoint(connection)))),
+                            new TaggedType[] { typeof(IUserLogin) },
+                            (ActorBindingFlags)0)
+                    }
+                    };
+
+                    var gateway = (channelType == ChannelType.Tcp)
+                        ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
+                        : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
+
+                    await gateway.Start();
+
+                    _gateways.Add(gateway);
                 }
-                };
-
-                var gateway = (_channelType == ChannelType.Tcp)
-                    ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), "TcpGateway").Cast<GatewayRef>()
-                    : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), "UdpGateway").Cast<GatewayRef>();
-
-                await gateway.Start();
-
-                _gateway = gateway;
             }
         }
 
         public override async Task Stop()
         {
-            if (_gateway != null)
+            // stop gateways
+
+            foreach (var gateway in _gateways)
             {
-                await _gateway.Stop();
-                await _gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
+                await gateway.Stop();
+                await gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
             }
+
+            // stop user container
 
             await _userContainer.GracefulStop(TimeSpan.FromSeconds(10), PoisonPill.Instance);
         }

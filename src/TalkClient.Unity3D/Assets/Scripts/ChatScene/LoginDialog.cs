@@ -1,32 +1,41 @@
 ﻿using System;
 using System.Collections;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using UnityEngine;
-using UnityEngine.UI;
-using Domain;
 using Akka.Interfaced.SlimSocket;
 using Akka.Interfaced.SlimSocket.Client;
+using Domain;
 using Common.Logging;
+using UnityEngine;
+using UnityEngine.UI;
 
 public class LoginDialog : UiDialog
 {
     public InputField ServerInput;
+    public Dropdown ServerProtocol;
     public InputField IdInput;
     public InputField PasswordInput;
 
     private bool _isLoginBusy;
     private IUserEventObserver _userEventObserver;
 
+    private void Awake()
+    {
+        ServerProtocol.AddOptions(Enum.GetNames(typeof(ChannelType)).ToList());
+    }
+
     public override void OnShow(object param)
     {
         _userEventObserver = (IUserEventObserver)param;
 
         var loginServer = PlayerPrefs.GetString("LoginServer", "127.0.0.1:9001");
+        var loginServerType = PlayerPrefs.GetString("LoginServerType", "Tcp");
         var loginId = PlayerPrefs.GetString("LoginId", "test");
         var loginPassword = PlayerPrefs.GetString("LoginPassword", "1234");
 
         ServerInput.text = loginServer;
+        ServerProtocol.value = ServerProtocol.options.FindIndex(v => v.text.Equals(loginServerType, StringComparison.OrdinalIgnoreCase));
         IdInput.text = loginId;
         PasswordInput.text = loginPassword;
     }
@@ -39,13 +48,16 @@ public class LoginDialog : UiDialog
         _isLoginBusy = true;
 
         PlayerPrefs.SetString("LoginServer", ServerInput.text);
+        PlayerPrefs.SetString("LoginServerType", ServerProtocol.captionText.text);
         PlayerPrefs.SetString("LoginId", IdInput.text);
         PlayerPrefs.SetString("LoginPassword", PasswordInput.text);
 
-        StartCoroutine(ProcessLogin(ServerInput.text, IdInput.text, PasswordInput.text));
+        var channelType = (ChannelType)Enum.Parse(typeof(ChannelType), ServerProtocol.captionText.text, true);
+
+        StartCoroutine(ProcessLogin(ServerInput.text, channelType, IdInput.text, PasswordInput.text));
     }
 
-    private IEnumerator ProcessLogin(string server, string id, string password)
+    private IEnumerator ProcessLogin(string server, ChannelType type, string id, string password)
     {
         try
         {
@@ -63,7 +75,7 @@ public class LoginDialog : UiDialog
             var channelFactory = ChannelFactoryBuilder.Build<DomainProtobufSerializer>(
                 endPoint: serverEndPoint,
                 createChannelLogger: () => LogManager.GetLogger("Channel"));
-            channelFactory.Type = ChannelType.Tcp;
+            channelFactory.Type = type;
             var channel = channelFactory.Create();
 
             // connect to gateway
