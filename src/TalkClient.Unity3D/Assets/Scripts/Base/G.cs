@@ -1,4 +1,5 @@
-﻿using Akka.Interfaced.SlimSocket.Client;
+﻿using System.Net;
+using Akka.Interfaced.SlimSocket.Client;
 using Common.Logging;
 using Domain;
 
@@ -18,6 +19,8 @@ public static class G
         get { return _channel; }
         set { _channel = value; }
     }
+
+    public static readonly IPEndPoint DefaultServerEndPoint = new IPEndPoint(IPAddress.Loopback, 9001);
 
     // Logger
 

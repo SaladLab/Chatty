@@ -1,22 +1,19 @@
 ﻿using System;
 using System.Collections;
 using System.Net;
-using System.Globalization;
+using System.Net.Sockets;
 using UnityEngine;
 using UnityEngine.UI;
-using DG.Tweening;
 using Domain;
 using Akka.Interfaced.SlimSocket;
 using Akka.Interfaced.SlimSocket.Client;
 using Common.Logging;
-using TypeAlias;
 
 public class LoginDialog : UiDialog
 {
     public InputField ServerInput;
     public InputField IdInput;
     public InputField PasswordInput;
-    public Text MessageText;
 
     private bool _isLoginBusy;
     private IUserEventObserver _userEventObserver;
@@ -32,8 +29,6 @@ public class LoginDialog : UiDialog
         ServerInput.text = loginServer;
         IdInput.text = loginId;
         PasswordInput.text = loginPassword;
-
-        SetMessage(null);
     }
 
     public void OnLoginButtonClick()
@@ -42,7 +37,6 @@ public class LoginDialog : UiDialog
             return;
 
         _isLoginBusy = true;
-        SetMessage(null);
 
         PlayerPrefs.SetString("LoginServer", ServerInput.text);
         PlayerPrefs.SetString("LoginId", IdInput.text);
@@ -58,11 +52,11 @@ public class LoginDialog : UiDialog
             IPEndPoint serverEndPoint;
             try
             {
-                serverEndPoint = CreateIPEndPoint(server);
+                serverEndPoint = GetEndPointAddress(server);
             }
             catch (Exception e)
             {
-                SetMessage(e.ToString());
+                UiMessageBox.ShowMessageBox("Server address error:\n" + e.ToString());
                 yield break;
             }
 
@@ -78,15 +72,14 @@ public class LoginDialog : UiDialog
             yield return t0.WaitHandle;
             if (t0.Exception != null)
             {
-                SetMessage("Connection Failed: " + t0.Exception.Message);
+                UiMessageBox.ShowMessageBox("Connect error:\n" + t0.Exception.Message);
                 yield break;
             }
-            G.Channel = channel;
 
             // Try Login
 
-            var userLogin = G.Channel.CreateRef<UserLoginRef>();
-            var observer = G.Channel.CreateObserver(_userEventObserver);
+            var userLogin = channel.CreateRef<UserLoginRef>();
+            var observer = channel.CreateObserver(_userEventObserver);
             var t1 = userLogin.Login(id, password, observer);
             yield return t1.WaitHandle;
             if (t1.Exception != null)
@@ -94,16 +87,14 @@ public class LoginDialog : UiDialog
                 channel.RemoveObserver(observer);
                 var re = t1.Exception as ResultException;
                 if (re != null)
-                {
-                    SetMessage(re.ResultCode.ToString());
-                }
+                    UiMessageBox.ShowMessageBox("Login error:\n" + re.ResultCode.ToString());
                 else
-                {
-                    SetMessage(t1.Exception.ToString());
-                }
+                    UiMessageBox.ShowMessageBox("Login error:\n" + t1.Exception.ToString());
+                channel.Close();
                 yield break;
             }
 
+            G.Channel = channel;
             G.User = (UserRef)t1.Result;
             G.UserId = id;
             Hide(id);
@@ -114,47 +105,34 @@ public class LoginDialog : UiDialog
         }
     }
 
-    private void SetMessage(string message)
+    public static IPEndPoint GetEndPointAddress(string address)
     {
-        TweenHelper.KillAllTweensOfObject(MessageText);
+        var a = address.Trim();
 
-        if (string.IsNullOrEmpty(message))
-        {
-            MessageText.text = "";
-        }
-        else
-        {
-            MessageText.text = message;
-            MessageText.DOFade(1f, 0.5f);
-            MessageText.DOFade(0f, 0.5f).SetDelay(5);
-        }
-    }
+        // use deault if empty string
 
-    // http://stackoverflow.com/questions/2727609/best-way-to-create-ipendpoint-from-string
-    private static IPEndPoint CreateIPEndPoint(string endPoint)
-    {
-        string[] ep = endPoint.Split(':');
-        if (ep.Length < 2) throw new FormatException("Invalid endpoint format");
-        IPAddress ip;
-        if (ep.Length > 2)
+        if (string.IsNullOrEmpty(a))
         {
-            if (!IPAddress.TryParse(string.Join(":", ep, 0, ep.Length - 1), out ip))
+            return G.DefaultServerEndPoint;
+        }
+
+        // use 192.168.0.num if *.num when local ip address is 192.168.0.~
+
+        if (a.StartsWith("*."))
+        {
+            var end = int.Parse(a.Substring(2));
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            foreach (var ip in host.AddressList)
             {
-                throw new FormatException("Invalid ip-adress");
+                if (ip.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    var abytes = ip.GetAddressBytes();
+                    abytes[abytes.Length - 1] = (byte)end;
+                    return new IPEndPoint(new IPAddress(abytes), G.DefaultServerEndPoint.Port);
+                }
             }
         }
-        else
-        {
-            if (!IPAddress.TryParse(ep[0], out ip))
-            {
-                throw new FormatException("Invalid ip-adress");
-            }
-        }
-        int port;
-        if (!int.TryParse(ep[ep.Length - 1], NumberStyles.None, NumberFormatInfo.CurrentInfo, out port))
-        {
-            throw new FormatException("Invalid port");
-        }
-        return new IPEndPoint(ip, port);
+
+        return IPEndPointHelper.Parse(address, G.DefaultServerEndPoint.Port);
     }
 }

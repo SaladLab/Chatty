@@ -32,10 +32,6 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
         ControlPanel.RoomItemSelected = OnRoomItemClick;
 
         ChatPanelTemplate.SetActive(false);
-    }
-
-    private void Update()
-    {
         CheckLoginedOrTryToLogin();
     }
 
@@ -55,6 +51,8 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
             var loginDialog = UiManager.Instance.ShowModalRoot<LoginDialog>(this);
             yield return StartCoroutine(loginDialog.WaitForHide());
 
+            G.Channel.StateChanged += (_, state) => { if (state == ChannelStateType.Closed) ChannelEventDispatcher.Post(OnChannelClose, _); };
+
             if (loginDialog.ReturnValue != null)
             {
                 var result = (string)loginDialog.ReturnValue;
@@ -69,6 +67,26 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
         }
     }
 
+    private void OnChannelClose(object channel)
+    {
+        // clear rooms
+
+        foreach (var item in _roomItemMap)
+        {
+            ControlPanel.DeleteRoomItem(item.Key);
+            DestroyObject(item.Value.ChatPanel.gameObject);
+        }
+        _roomItemMap.Clear();
+
+        // clear global connection state and try to reconnect
+
+        G.Channel = null;
+        G.User = null;
+        G.UserId = null;
+
+        CheckLoginedOrTryToLogin();
+    }
+
     private void OnRoomTextClick()
     {
         if (G.User == null || _isBusy)
@@ -80,7 +98,10 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
     private void OnLogoutButtonClick()
     {
-        // TODO:IMPL
+        if (G.Channel != null)
+        {
+            G.Channel.Close();
+        }
     }
 
     private void OnRoomButtonClick()
@@ -101,7 +122,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
             if (t1.Exception != null)
             {
-                Debug.Log(t1.Exception.ToString());
+                UiMessageBox.ShowMessageBox("GetRoomList error:\n" + t1.Exception.Message);
                 yield break;
             }
 
@@ -141,14 +162,15 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
         // Try to enter the room
 
         var observer = G.Channel.CreateObserver<IRoomObserver>(chatPanel);
+        observer.GetEventDispatcher().Pending = true;
         var t1 = user.EnterRoom(roomName, observer);
         yield return t1.WaitHandle;
 
         if (t1.Status != TaskStatus.RanToCompletion)
         {
             G.Channel.RemoveObserver(observer);
-            GameObject.DestroyObject(go);
-            Debug.LogError(t1.Exception.ToString());
+            DestroyObject(go);
+            UiMessageBox.ShowMessageBox("Enter room error:\n" + t1.Exception.ToString());
             yield break;
         }
 
@@ -167,6 +189,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
         };
         _roomItemMap.Add(roomName, item);
         ControlPanel.AddRoomItem(roomName);
+        observer.GetEventDispatcher().Pending = false;
 
         // Select
 
@@ -201,7 +224,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
             yield return t1.WaitHandle;
             if (t1.Status != TaskStatus.RanToCompletion)
             {
-                Debug.LogError("ProcessExitFromRoom failed: " + t1.Exception);
+                UiMessageBox.ShowMessageBox("Exit room error:\n" + t1.Exception.ToString());
                 yield break;
             }
 

@@ -21,15 +21,6 @@ public class ControlPanel : MonoBehaviour
     {
         UserNameText.text = "";
         RoomItemTemplate.SetActive(false);
-
-        /*
-        AddRoomItem("#general");
-        AddRoomItem("#chat");
-        AddRoomItem("#test");
-        AddRoomItem("#test2");
-        DeleteRoomItem("#chat");
-        SelectRoomItem("#test");
-        */
     }
 
     public void SetUserName(string name)
@@ -39,8 +30,6 @@ public class ControlPanel : MonoBehaviour
 
     public void AddRoomItem(string roomName)
     {
-        Debug.Log(roomName);
-
         // create game object
 
         var go = UiHelper.AddChild(Rooms, RoomItemTemplate);

@@ -11,6 +11,7 @@ namespace TalkClient.Console
     internal class ChatConsole : IUserEventObserver
     {
         private IChannel _channel;
+        private CancellationTokenSource _channelCloseCts;
         private UserRef _user;
         private UserEventObserver _userEventObserver;
         private Dictionary<string, Tuple<OccupantRef, RoomObserver>> _roomMap =
@@ -20,23 +21,41 @@ namespace TalkClient.Console
         public async Task RunAsync(IChannel channel, string userId, string password)
         {
             _channel = channel;
+            _channel.StateChanged += (_, state) => { if (state == ChannelStateType.Closed) _channelCloseCts?.Cancel(); };
 
             ConsoleUtil.Out("[ Chatty.Console ]");
             ConsoleUtil.Out("");
 
             ConsoleUtil.Out("Try to connect...");
-            await _channel.ConnectAsync();
+            try
+            {
+                await _channel.ConnectAsync();
+            }
+            catch (Exception e)
+            {
+                System.Console.WriteLine("Failed to connect: " + e.Message);
+                return;
+            }
+
             ConsoleUtil.Out("Connected!");
             ConsoleUtil.Out("");
 
             OnCommandShowHelp();
             ConsoleUtil.Out("");
 
-            if (await LoginAsync(userId, password) == false)
-                return;
+            try
+            {
+                if (await LoginAsync(userId, password) == false)
+                    return;
 
-            await OnCommandEnterRoom("", "#general");
-            await ChatLoopAsync();
+                await OnCommandEnterRoom("", "#general");
+                await ChatLoopAsync();
+            }
+            catch (TaskCanceledException)
+            {
+                System.Console.WriteLine("Disconnected!");
+                return;
+            }
         }
 
         private async Task<bool> LoginAsync(string userId, string password)
@@ -135,14 +154,16 @@ namespace TalkClient.Console
             try
             {
                 var name = words[1];
-                var info = await EnterRoomAsync(name);
+                var ret = await EnterRoomAsync(name);
                 ConsoleUtil.Sys($"entered {name}");
 
-                if (info.History != null)
+                if (ret.Item1.History != null)
                 {
-                    foreach (var chatItem in info.History.Skip(Math.Max(0, info.History.Count() - 5)))
+                    foreach (var chatItem in ret.Item1.History.Skip(Math.Max(0, ret.Item1.History.Count() - 5)))
                         ConsoleUtil.Out($"[{name}] {chatItem.UserId}: {chatItem.Message}");
                 }
+
+                ret.Item2.GetEventDispatcher().Pending = false;
             }
             catch (Exception e)
             {
@@ -256,19 +277,22 @@ namespace TalkClient.Console
             // we cannot read any chat message while reading console.
             // To avoid this problem we read console in another thread in ThreadPool.
             var tcs = new TaskCompletionSource<string>();
+            _channelCloseCts = new CancellationTokenSource();
+            _channelCloseCts.Token.Register(() => tcs.SetCanceled());
             ThreadPool.QueueUserWorkItem(_ => { tcs.SetResult(System.Console.ReadLine()); });
             return tcs.Task;
         }
 
-        private async Task<RoomInfo> EnterRoomAsync(string name)
+        private async Task<Tuple<RoomInfo, IRoomObserver>> EnterRoomAsync(string name)
         {
             var observer = _channel.CreateObserver<IRoomObserver>(new RoomConsole(name));
+            observer.GetEventDispatcher().Pending = true;
             try
             {
                 var ret = await _user.EnterRoom(name, observer);
                 _roomMap.Add(name, Tuple.Create((OccupantRef)ret.Item1, (RoomObserver)observer));
                 _currentRoomName = name;
-                return ret.Item2;
+                return Tuple.Create(ret.Item2, observer);
             }
             catch (Exception)
             {
