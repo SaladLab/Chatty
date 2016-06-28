@@ -57,7 +57,7 @@ namespace TalkServer
             }
         }
 
-        private IEnumerable<Tuple<string, Type, HoconObject>> ResolveRoles(IList<HoconValue> roles)
+        private IEnumerable<Tuple<string, Type, HoconValue>> ResolveRoles(IList<HoconValue> roles)
         {
             foreach (var role in roles)
             {
@@ -67,20 +67,20 @@ namespace TalkServer
                     // "Role"
                     var id = role.GetString();
                     var type = _roleToTypeMap[id];
-                    yield return Tuple.Create(id, type, new HoconObject());
+                    yield return Tuple.Create(id, type, new HoconValue());
                 }
                 else
                 {
                     // [ "Role", { config } ]
                     var id = arr[0].GetString();
                     var type = _roleToTypeMap[id];
-                    var config = arr[1].GetObject();
+                    var config = arr[1];
                     yield return Tuple.Create(id, type, config);
                 }
             }
         }
 
-        public async Task LaunchNode(int port, IEnumerable<Tuple<string, Type, HoconObject>> roles)
+        public async Task LaunchNode(int port, IEnumerable<Tuple<string, Type, HoconValue>> roles)
         {
             // setup system
 
@@ -106,7 +106,7 @@ namespace TalkServer
             var workers = new List<ClusterRoleWorker>();
             foreach (var role in roles)
             {
-                var worker = (ClusterRoleWorker)Activator.CreateInstance(role.Item2, context, role.Item3);
+                var worker = (ClusterRoleWorker)Activator.CreateInstance(role.Item2, context, new Config(new HoconRoot(role.Item3)));
                 await worker.Start();
                 workers.Add(worker);
             }

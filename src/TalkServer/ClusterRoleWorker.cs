@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Configuration.Hocon;
+using Akka.Configuration;
 using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Akka.Interfaced.SlimServer;
@@ -44,7 +44,7 @@ namespace TalkServer
     {
         private IActorRef _userTable;
 
-        public UserTableWorker(ClusterNodeContext context, HoconObject config)
+        public UserTableWorker(ClusterNodeContext context, Config config)
             : base(context)
         {
         }
@@ -69,15 +69,15 @@ namespace TalkServer
     public class UserWorker : ClusterRoleWorker
     {
         private IActorRef _userContainer;
-        private List<ChannelType> _channelTypes;
+        private ChannelType _channelType;
         private IPEndPoint _listenEndPoint;
-        private List<GatewayRef> _gateways;
+        private GatewayRef _gateway;
 
-        public UserWorker(ClusterNodeContext context, HoconObject config)
+        public UserWorker(ClusterNodeContext context, Config config)
             : base(context)
         {
-            _channelTypes = new List<ChannelType> { ChannelType.Tcp, ChannelType.Udp };
-            _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetKey("port")?.GetInt() ?? 0);
+            _channelType = (ChannelType)Enum.Parse(typeof(ChannelType), config.GetString("type", "Tcp"));
+            _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetInt("port", 0));
         }
 
         public override async Task Start()
@@ -91,50 +91,43 @@ namespace TalkServer
 
             // create gateway for users to connect to
 
-            _gateways = new List<GatewayRef>();
             if (_listenEndPoint.Port != 0)
             {
                 var serializer = PacketSerializer.CreatePacketSerializer();
 
-                foreach (var channelType in _channelTypes)
+                var name = $"UserGateway({_channelType})";
+                var initiator = new GatewayInitiator
                 {
-                    var name = $"UserGateway({channelType})";
-                    var initiator = new GatewayInitiator
+                    ListenEndPoint = _listenEndPoint,
+                    GatewayLogger = LogManager.GetLogger(name),
+                    CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
+                    ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
+                    PacketSerializer = serializer,
+                    CreateInitialActors = (context, connection) => new[]
                     {
-                        ListenEndPoint = _listenEndPoint,
-                        GatewayLogger = LogManager.GetLogger(name),
-                        CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
-                        ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
-                        PacketSerializer = serializer,
-                        CreateInitialActors = (context, connection) => new[]
-                        {
                         Tuple.Create(
                             context.ActorOf(Props.Create(() =>
                                 new UserLoginActor(Context, context.Self.Cast<ActorBoundChannelRef>(), GatewayInitiator.GetRemoteEndPoint(connection)))),
                             new TaggedType[] { typeof(IUserLogin) },
                             (ActorBindingFlags)0)
                     }
-                    };
+                };
 
-                    var gateway = (channelType == ChannelType.Tcp)
-                        ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
-                        : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
-
-                    await gateway.Start();
-
-                    _gateways.Add(gateway);
-                }
+                _gateway = (_channelType == ChannelType.Tcp)
+                    ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
+                    : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
+                await _gateway.Start();
             }
         }
 
         public override async Task Stop()
         {
-            // stop gateways
+            // stop gateway
 
-            foreach (var gateway in _gateways)
+            if (_gateway != null)
             {
-                await gateway.Stop();
-                await gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
+                await _gateway.Stop();
+                await _gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
             }
 
             // stop user container
@@ -148,7 +141,7 @@ namespace TalkServer
     {
         private IActorRef _roomTable;
 
-        public RoomTableWorker(ClusterNodeContext context, HoconObject config)
+        public RoomTableWorker(ClusterNodeContext context, Config config)
             : base(context)
         {
         }
@@ -174,13 +167,20 @@ namespace TalkServer
     public class RoomWorker : ClusterRoleWorker
     {
         private IActorRef _roomContainer;
+        private ChannelType _channelType;
+        private IPEndPoint _listenEndPoint;
+        private IPEndPoint _connectEndPoint;
+        private GatewayRef _gateway;
 
-        public RoomWorker(ClusterNodeContext context, HoconObject config)
+        public RoomWorker(ClusterNodeContext context, Config config)
             : base(context)
         {
+            _channelType = (ChannelType)Enum.Parse(typeof(ChannelType), config.GetString("type", "Tcp"));
+            _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetInt("port", 0));
+            _connectEndPoint = new IPEndPoint(IPAddress.Parse(config.GetString("address", "127.0.0.1")), config.GetInt("port", 0));
         }
 
-        public override Task Start()
+        public override async Task Start()
         {
             // create RoomTableContainer
 
@@ -190,11 +190,42 @@ namespace TalkServer
                 "RoomTableContainer");
             Context.RoomTableContainer = _roomContainer;
 
-            return Task.FromResult(true);
+            // create a gateway for users to join room
+
+            if (_connectEndPoint.Port != 0)
+            {
+                var serializer = PacketSerializer.CreatePacketSerializer();
+
+                var name = $"RoomGateway({_channelType})";
+                var initiator = new GatewayInitiator
+                {
+                    ListenEndPoint = _listenEndPoint,
+                    ConnectEndPoint = _connectEndPoint,
+                    GatewayLogger = LogManager.GetLogger(name),
+                    TokenRequired = true,
+                    TokenTimeout = TimeSpan.FromMinutes(1),
+                    CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
+                    ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
+                    PacketSerializer = serializer,
+                };
+
+                _gateway = (_channelType == ChannelType.Tcp)
+                    ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
+                    : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
+                await _gateway.Start();
+                Context.RoomGateway = _gateway.Cast<ActorBoundGatewayRef>();
+            }
         }
 
         public override async Task Stop()
         {
+            // stop gateway
+
+            await _gateway.Stop();
+            await _gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
+
+            // stop room container
+
             await _roomContainer.GracefulStop(TimeSpan.FromSeconds(10), PoisonPill.Instance);
         }
     }
@@ -219,7 +250,7 @@ namespace TalkServer
     {
         private IActorRef _botCommander;
 
-        public BotWorker(ClusterNodeContext context, HoconObject config)
+        public BotWorker(ClusterNodeContext context, Config config)
             : base(context)
         {
         }
