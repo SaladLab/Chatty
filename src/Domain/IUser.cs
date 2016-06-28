@@ -8,7 +8,7 @@ namespace Domain
     public interface IUser : IInterfacedActor
     {
         Task<string> GetId();
-        Task<List<string>> GetRoomList();
+        Task<IList<string>> GetRoomList();
         Task<Tuple<IOccupant, RoomInfo>> EnterRoom(string name, IRoomObserver observer);
         Task ExitFromRoom(string name);
         Task Whisper(string targetUserId, string message);

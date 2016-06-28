@@ -55,7 +55,7 @@ namespace Domain
         public class GetHistory_Return
             : IInterfacedPayload, IValueGetable
         {
-            [ProtoMember(1)] public System.Collections.Generic.List<Domain.ChatItem> v;
+            [ProtoMember(1)] public System.Collections.Generic.IList<Domain.ChatItem> v;
 
             public Type GetInterfaceType()
             {
@@ -155,12 +155,12 @@ namespace Domain
             return new OccupantRef(Target, RequestWaiter, timeout);
         }
 
-        public Task<System.Collections.Generic.List<Domain.ChatItem>> GetHistory()
+        public Task<System.Collections.Generic.IList<Domain.ChatItem>> GetHistory()
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IOccupant_PayloadTable.GetHistory_Invoke {  }
             };
-            return SendRequestAndReceive<System.Collections.Generic.List<Domain.ChatItem>>(requestMessage);
+            return SendRequestAndReceive<System.Collections.Generic.IList<Domain.ChatItem>>(requestMessage);
         }
 
         public Task Invite(System.String targetUserId, System.String senderUserId = null)
@@ -227,7 +227,7 @@ namespace Domain
     [AlternativeInterface(typeof(IOccupant))]
     public interface IOccupantSync : IInterfacedActorSync
     {
-        System.Collections.Generic.List<Domain.ChatItem> GetHistory();
+        System.Collections.Generic.IList<Domain.ChatItem> GetHistory();
         void Invite(System.String targetUserId, System.String senderUserId = null);
         void Say(System.String msg, System.String senderUserId = null);
     }
@@ -552,7 +552,7 @@ namespace Domain
         public class GetRoomList_Return
             : IInterfacedPayload, IValueGetable
         {
-            [ProtoMember(1)] public System.Collections.Generic.List<System.String> v;
+            [ProtoMember(1)] public System.Collections.Generic.IList<System.String> v;
 
             public Type GetInterfaceType()
             {
@@ -649,12 +649,12 @@ namespace Domain
             return SendRequestAndReceive<System.String>(requestMessage);
         }
 
-        public Task<System.Collections.Generic.List<System.String>> GetRoomList()
+        public Task<System.Collections.Generic.IList<System.String>> GetRoomList()
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.GetRoomList_Invoke {  }
             };
-            return SendRequestAndReceive<System.Collections.Generic.List<System.String>>(requestMessage);
+            return SendRequestAndReceive<System.Collections.Generic.IList<System.String>>(requestMessage);
         }
 
         public Task Whisper(System.String targetUserId, System.String message)
@@ -732,7 +732,7 @@ namespace Domain
         System.Tuple<Domain.IOccupant, Domain.RoomInfo> EnterRoom(System.String name, Domain.IRoomObserver observer);
         void ExitFromRoom(System.String name);
         System.String GetId();
-        System.Collections.Generic.List<System.String> GetRoomList();
+        System.Collections.Generic.IList<System.String> GetRoomList();
         void Whisper(System.String targetUserId, System.String message);
     }
 }

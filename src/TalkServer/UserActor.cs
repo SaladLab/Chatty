@@ -52,7 +52,7 @@ namespace TalkServer
             return Task.FromResult(_id);
         }
 
-        async Task<List<string>> IUser.GetRoomList()
+        async Task<IList<string>> IUser.GetRoomList()
         {
             var reply = await _clusterContext.RoomTable.Ask<DistributedActorTableMessage<string>.GetIdsReply>(
                 new DistributedActorTableMessage<string>.GetIds());

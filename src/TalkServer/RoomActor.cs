@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using Akka.Actor;
@@ -27,7 +28,7 @@ namespace TalkServer
         private string _name;
         private Dictionary<string, UserData> _userMap;
         private bool _removed;
-        private List<ChatItem> _history;
+        private ImmutableList<ChatItem> _history;
         private static readonly int HistoryMax = 100;
 
         public RoomActor(ClusterNodeContext clusterContext, string name)
@@ -74,7 +75,7 @@ namespace TalkServer
                 }
             }
 
-            _history = history ?? new List<ChatItem>();
+            _history = (history ?? new List<ChatItem>()).ToImmutableList();
         }
 
         private async Task SaveAsync()
@@ -140,16 +141,16 @@ namespace TalkServer
                 throw new ResultException(ResultCodeType.NeedToBeInRoom);
 
             var chatItem = new ChatItem { Time = DateTime.UtcNow, UserId = senderUserId, Message = msg };
-            _history.Add(chatItem);
+            _history = _history.Add(chatItem);
             if (_history.Count > HistoryMax)
-                _history.RemoveRange(0, _history.Count - HistoryMax);
+                _history = _history.RemoveRange(0, _history.Count - HistoryMax);
 
             NotifyToAllObservers(o => o.Say(chatItem));
         }
 
-        Task<List<ChatItem>> IOccupant.GetHistory()
+        Task<IList<ChatItem>> IOccupant.GetHistory()
         {
-            return Task.FromResult(_history);
+            return Task.FromResult((IList<ChatItem>)_history);
         }
 
         async Task IOccupant.Invite(string targetUserId, string senderUserId)

@@ -8,7 +8,7 @@ namespace Domain
     public class RoomInfo
     {
         [ProtoMember(1)] public string Name;
-        [ProtoMember(2)] public List<string> Users;
-        [ProtoMember(3)] public List<ChatItem> History;
+        [ProtoMember(2)] public IList<string> Users;
+        [ProtoMember(3)] public IList<ChatItem> History;
     }
 }

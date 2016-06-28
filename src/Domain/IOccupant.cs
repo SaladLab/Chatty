@@ -9,7 +9,7 @@ namespace Domain
     public interface IOccupant : IInterfacedActor
     {
         Task Say(string msg, string senderUserId = null);
-        Task<List<ChatItem>> GetHistory();
+        Task<IList<ChatItem>> GetHistory();
         Task Invite(string targetUserId, string senderUserId = null);
     }
 }

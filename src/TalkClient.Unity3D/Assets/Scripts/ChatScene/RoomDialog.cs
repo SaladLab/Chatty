@@ -8,7 +8,7 @@ public class RoomDialog : UiDialog
     public class Argument
     {
         public string CurrentRoomName;
-        public List<string> RoomList;
+        public IList<string> RoomList;
     }
 
     public InputField NameInput;
