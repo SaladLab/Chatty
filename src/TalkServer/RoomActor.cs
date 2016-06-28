@@ -15,7 +15,7 @@ namespace TalkServer
 {
     [Log]
     [ResponsiveException(typeof(ResultException))]
-    public class RoomActor : InterfacedActor, IRoom, IOccupant
+    public class RoomActor : InterfacedActor, IRoomSync, IExtendedInterface<IOccupant>
     {
         private class UserData
         {
@@ -91,7 +91,7 @@ namespace TalkServer
             }
         }
 
-        async Task<RoomInfo> IRoom.Enter(string userId, IRoomObserver observer)
+        RoomInfo IRoomSync.Enter(string userId, IRoomObserver observer)
         {
             if (_removed)
                 throw new ResultException(ResultCodeType.RoomRemoved);
@@ -115,7 +115,7 @@ namespace TalkServer
             };
         }
 
-        async Task IRoom.Exit(string userId)
+        void IRoomSync.Exit(string userId)
         {
             if (_userMap.ContainsKey(userId) == false)
                 throw new ResultException(ResultCodeType.NeedToBeInRoom);
@@ -135,7 +135,8 @@ namespace TalkServer
             }
         }
 
-        async Task IOccupant.Say(string msg, string senderUserId)
+        [ExtendedHandler]
+        private void Say(string msg, string senderUserId)
         {
             if (_userMap.ContainsKey(senderUserId) == false)
                 throw new ResultException(ResultCodeType.NeedToBeInRoom);
@@ -148,12 +149,14 @@ namespace TalkServer
             NotifyToAllObservers(o => o.Say(chatItem));
         }
 
-        Task<IList<ChatItem>> IOccupant.GetHistory()
+        [ExtendedHandler]
+        private IList<ChatItem> GetHistory()
         {
-            return Task.FromResult((IList<ChatItem>)_history);
+            return _history;
         }
 
-        async Task IOccupant.Invite(string targetUserId, string senderUserId)
+        [ExtendedHandler]
+        private async Task Invite(string targetUserId, string senderUserId)
         {
             if (targetUserId == senderUserId)
                 throw new ResultException(ResultCodeType.UserNotMyself);
