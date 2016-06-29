@@ -95,7 +95,7 @@ namespace TalkServer
             {
                 var serializer = PacketSerializer.CreatePacketSerializer();
 
-                var name = $"UserGateway({_channelType})";
+                var name = "UserGateway";
                 var initiator = new GatewayInitiator
                 {
                     ListenEndPoint = _listenEndPoint,
@@ -196,7 +196,7 @@ namespace TalkServer
             {
                 var serializer = PacketSerializer.CreatePacketSerializer();
 
-                var name = $"RoomGateway({_channelType})";
+                var name = "RoomGateway";
                 var initiator = new GatewayInitiator
                 {
                     ListenEndPoint = _listenEndPoint,
@@ -213,7 +213,6 @@ namespace TalkServer
                     ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
                     : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
                 await _gateway.Start();
-                Context.RoomGateway = _gateway.Cast<ActorBoundGatewayRef>();
             }
         }
 

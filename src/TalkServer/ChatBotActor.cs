@@ -94,6 +94,10 @@ namespace TalkServer
             return (_pattern != null) ? _pattern.OnTimer() : Task.FromResult(true);
         }
 
+        void IActorBoundChannelSync.SetTag(object tag)
+        {
+        }
+
         InterfacedActorRef IActorBoundChannelSync.BindActor(InterfacedActorRef actor, ActorBindingFlags bindingFlags)
         {
             var targetActor = ((AkkaActorTarget)actor.Target).Actor;

@@ -5,23 +5,33 @@ using System.Threading;
 using System.Threading.Tasks;
 using Akka.Interfaced.SlimSocket.Client;
 using Domain;
+using Akka.Interfaced;
 
 namespace TalkClient.Console
 {
     internal class ChatConsole : IUserEventObserver
     {
-        private IChannel _channel;
+        private Communicator _comm;
         private CancellationTokenSource _channelCloseCts;
         private UserRef _user;
         private UserEventObserver _userEventObserver;
-        private Dictionary<string, Tuple<OccupantRef, RoomObserver>> _roomMap =
-            new Dictionary<string, Tuple<OccupantRef, RoomObserver>>();
+
+        private class RoomItem
+        {
+            public OccupantRef Occupant;
+            public RoomObserver Observer;
+            public IChannel Channel;
+        }
+
+        private Dictionary<string, RoomItem> _roomMap = new Dictionary<string, RoomItem>();
         private string _currentRoomName;
 
-        public async Task RunAsync(IChannel channel, string userId, string password)
+        public async Task RunAsync(Communicator commnuicator, string userId, string password)
         {
-            _channel = channel;
-            _channel.StateChanged += (_, state) => { if (state == ChannelStateType.Closed) _channelCloseCts?.Cancel(); };
+            _comm = commnuicator;
+
+            _comm.CreateChannel();
+            _comm.Channel.StateChanged += (_, state) => { if (state == ChannelStateType.Closed) _channelCloseCts?.Cancel(); };
 
             ConsoleUtil.Out("[ Chatty.Console ]");
             ConsoleUtil.Out("");
@@ -29,7 +39,7 @@ namespace TalkClient.Console
             ConsoleUtil.Out("Try to connect...");
             try
             {
-                await _channel.ConnectAsync();
+                await _comm.Channel.ConnectAsync();
             }
             catch (Exception e)
             {
@@ -60,8 +70,8 @@ namespace TalkClient.Console
 
         private async Task<bool> LoginAsync(string userId, string password)
         {
-            var userLogin = _channel.CreateRef<UserLoginRef>();
-            var observer = _channel.CreateObserver<IUserEventObserver>(this);
+            var userLogin = _comm.Channel.CreateRef<UserLoginRef>();
+            var observer = _comm.ObserverRegistry.Create<IUserEventObserver>(this);
 
             try
             {
@@ -72,7 +82,7 @@ namespace TalkClient.Console
             }
             catch (Exception e)
             {
-                _channel.RemoveObserver(observer);
+                _comm.ObserverRegistry.Remove(observer);
                 ConsoleUtil.Err($"Failed to login {userId} with " + e);
                 return false;
             }
@@ -143,7 +153,19 @@ namespace TalkClient.Console
                     }
                     else
                     {
-                        await _roomMap[_currentRoomName].Item1.Say(line);
+                        try
+                        {
+                            await _roomMap[_currentRoomName].Occupant.Say(line);
+                        }
+                        catch (RequestChannelException)
+                        {
+                            ConsoleUtil.Err("Failed to say because channel is closed. Leave this room.");
+                            await OnCommandExitFromRoom();
+                        }
+                        catch (Exception e)
+                        {
+                            ConsoleUtil.Err("Failed to say: " + e);
+                        }
                     }
                 }
             }
@@ -221,7 +243,7 @@ namespace TalkClient.Console
             }
             else
             {
-                var occupant = _roomMap[_currentRoomName].Item1;
+                var occupant = _roomMap[_currentRoomName].Occupant;
                 for (var i = 1; i < words.Length; i++)
                 {
                     try
@@ -278,38 +300,51 @@ namespace TalkClient.Console
             // To avoid this problem we read console in another thread in ThreadPool.
             var tcs = new TaskCompletionSource<string>();
             _channelCloseCts = new CancellationTokenSource();
-            _channelCloseCts.Token.Register(() => tcs.SetCanceled());
-            ThreadPool.QueueUserWorkItem(_ => { tcs.SetResult(System.Console.ReadLine()); });
+            _channelCloseCts.Token.Register(() => tcs.TrySetCanceled());
+            ThreadPool.QueueUserWorkItem(_ => { tcs.TrySetResult(System.Console.ReadLine()); });
             return tcs.Task;
         }
 
         private async Task<Tuple<RoomInfo, IRoomObserver>> EnterRoomAsync(string name)
         {
-            var observer = _channel.CreateObserver<IRoomObserver>(new RoomConsole(name));
+            var observer = _comm.ObserverRegistry.Create<IRoomObserver>(new RoomConsole(name));
             observer.GetEventDispatcher().Pending = true;
+            observer.GetEventDispatcher().KeepingOrder = true;
             try
             {
                 var ret = await _user.EnterRoom(name, observer);
-                _roomMap.Add(name, Tuple.Create((OccupantRef)ret.Item1, (RoomObserver)observer));
+                var occupant = (OccupantRef)ret.Item1;
+                if (occupant.RequestWaiter != _comm.Channel)
+                    await ((IChannel)occupant.RequestWaiter).ConnectAsync();
+                _roomMap.Add(name, new RoomItem
+                {
+                    Occupant = occupant,
+                    Observer = (RoomObserver)observer,
+                    Channel = (IChannel)occupant.RequestWaiter
+                });
                 _currentRoomName = name;
                 return Tuple.Create(ret.Item2, observer);
             }
             catch (Exception)
             {
-                _channel.RemoveObserver(observer);
+                _comm.ObserverRegistry.Remove(observer);
                 throw;
             }
         }
 
         private async Task ExitRoomAsync(string name)
         {
-            Tuple<OccupantRef, RoomObserver> item;
+            RoomItem item;
             if (_roomMap.TryGetValue(name, out item) == false)
                 throw new Exception("Cannot find room: " + name);
 
             await _user.ExitFromRoom(name);
-            _channel.RemoveObserver(item.Item2);
+
+            _comm.ObserverRegistry.Remove(item.Observer);
             _roomMap.Remove(name);
+
+            if (item.Channel != _comm.Channel)
+                item.Channel.Close();
         }
 
         void IUserEventObserver.Invite(string invitorUserId, string roomName)

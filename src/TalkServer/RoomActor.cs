@@ -10,12 +10,13 @@ using Akka.Interfaced.LogFilter;
 using Common.Logging;
 using Newtonsoft.Json;
 using Domain;
+using Akka.Interfaced.SlimServer;
 
 namespace TalkServer
 {
     [Log]
     [ResponsiveException(typeof(ResultException))]
-    public class RoomActor : InterfacedActor, IRoomSync, IExtendedInterface<IOccupant>
+    public class RoomActor : InterfacedActor, IExtendedInterface<IRoom, IOccupant>, IActorBoundChannelObserver
     {
         private class UserData
         {
@@ -91,11 +92,11 @@ namespace TalkServer
             }
         }
 
-        RoomInfo IRoomSync.Enter(string userId, IRoomObserver observer)
+        [ExtendedHandler]
+        private RoomInfo Enter(string userId, IRoomObserver observer)
         {
             if (_removed)
                 throw new ResultException(ResultCodeType.RoomRemoved);
-
             if (_userMap.ContainsKey(userId))
                 throw new ResultException(ResultCodeType.NeedToBeOutOfRoom);
 
@@ -115,7 +116,8 @@ namespace TalkServer
             };
         }
 
-        void IRoomSync.Exit(string userId)
+        [ExtendedHandler]
+        private void Exit(string userId)
         {
             if (_userMap.ContainsKey(userId) == false)
                 throw new ResultException(ResultCodeType.NeedToBeInRoom);
@@ -171,6 +173,36 @@ namespace TalkServer
                 throw new ResultException(ResultCodeType.UserNotOnline);
 
             targetUser.Cast<UserMessasingRef>().WithNoReply().Invite(senderUserId, _name);
+        }
+
+        void IActorBoundChannelObserver.ChannelOpen(IActorBoundChannel channel, object tag)
+        {
+            // Change notification message route to open channel
+
+            var userId = tag as string;
+            if (userId != null)
+            {
+                UserData userData;
+                if (_userMap.TryGetValue(userId, out userData))
+                {
+                    var actorChannel = userData.Observer.Channel as ActorNotificationChannel;
+                    if (actorChannel != null)
+                        userData.Observer.Channel = new ActorNotificationChannel(((ActorBoundChannelRef)channel).CastToIActorRef());
+                }
+            }
+        }
+
+        void IActorBoundChannelObserver.ChannelClose(IActorBoundChannel channel, object tag)
+        {
+            // Deactivate observer bound to closed channel
+
+            var userId = tag as string;
+            if (userId != null)
+            {
+                UserData userData;
+                if (_userMap.TryGetValue(userId, out userData))
+                    userData.Observer = null;
+            }
         }
     }
 }

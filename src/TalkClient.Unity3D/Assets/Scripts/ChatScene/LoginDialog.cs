@@ -72,15 +72,19 @@ public class LoginDialog : UiDialog
                 yield break;
             }
 
-            var channelFactory = ChannelFactoryBuilder.Build<DomainProtobufSerializer>(
-                endPoint: serverEndPoint,
-                createChannelLogger: () => LogManager.GetLogger("Channel"));
-            channelFactory.Type = type;
-            var channel = channelFactory.Create();
+            var communicator = UnityCommunicatorFactory.Create();
+            {
+                var channelFactory = communicator.ChannelFactory;
+                channelFactory.Type = ChannelType.Tcp;
+                channelFactory.ConnectEndPoint = new IPEndPoint(IPAddress.Loopback, 9001);
+                channelFactory.CreateChannelLogger = () => LogManager.GetLogger("Channel");
+                channelFactory.PacketSerializer = PacketSerializer.CreatePacketSerializer<DomainProtobufSerializer>();
+            }
+            communicator.CreateChannel();
 
             // connect to gateway
 
-            var t0 = channel.ConnectAsync();
+            var t0 = communicator.Channel.ConnectAsync();
             yield return t0.WaitHandle;
             if (t0.Exception != null)
             {
@@ -90,23 +94,23 @@ public class LoginDialog : UiDialog
 
             // Try Login
 
-            var userLogin = channel.CreateRef<UserLoginRef>();
-            var observer = channel.CreateObserver(_userEventObserver);
+            var userLogin = communicator.Channel.CreateRef<UserLoginRef>();
+            var observer = communicator.ObserverRegistry.Create(_userEventObserver);
             var t1 = userLogin.Login(id, password, observer);
             yield return t1.WaitHandle;
             if (t1.Exception != null)
             {
-                channel.RemoveObserver(observer);
+                communicator.ObserverRegistry.Remove(observer);
                 var re = t1.Exception as ResultException;
                 if (re != null)
                     UiMessageBox.ShowMessageBox("Login error:\n" + re.ResultCode.ToString());
                 else
                     UiMessageBox.ShowMessageBox("Login error:\n" + t1.Exception.ToString());
-                channel.Close();
+                communicator.Channel.Close();
                 yield break;
             }
 
-            G.Channel = channel;
+            G.Communicator = communicator;
             G.User = (UserRef)t1.Result;
             G.UserId = id;
             Hide(id);

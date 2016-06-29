@@ -20,6 +20,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
         public ChatPanel ChatPanel;
         public OccupantRef Occupant;
         public RoomObserver Observer;
+        public IChannel Channel;
     }
     private Dictionary<string, RoomItem> _roomItemMap = new Dictionary<string, RoomItem>();
 
@@ -51,7 +52,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
             var loginDialog = UiManager.Instance.ShowModalRoot<LoginDialog>(this);
             yield return StartCoroutine(loginDialog.WaitForHide());
 
-            G.Channel.StateChanged += (_, state) => { if (state == ChannelStateType.Closed) ChannelEventDispatcher.Post(OnChannelClose, _); };
+            G.Communicator.Channel.StateChanged += (_, state) => { if (state == ChannelStateType.Closed) ChannelEventDispatcher.Post(OnChannelClose, _); };
 
             if (loginDialog.ReturnValue != null)
             {
@@ -80,7 +81,8 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
         // clear global connection state and try to reconnect
 
-        G.Channel = null;
+        G.Communicator.Channel.Close();
+        G.Communicator = null;
         G.User = null;
         G.UserId = null;
 
@@ -98,9 +100,9 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
     private void OnLogoutButtonClick()
     {
-        if (G.Channel != null)
+        if (G.Communicator.Channel != null)
         {
-            G.Channel.Close();
+            G.Communicator.Channel.Close();
         }
     }
 
@@ -161,22 +163,27 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
         // Try to enter the room
 
-        var observer = G.Channel.CreateObserver<IRoomObserver>(chatPanel);
+        var observer = G.Communicator.ObserverRegistry.Create<IRoomObserver>(chatPanel);
         observer.GetEventDispatcher().Pending = true;
+        observer.GetEventDispatcher().KeepingOrder= true;
         var t1 = user.EnterRoom(roomName, observer);
         yield return t1.WaitHandle;
 
         if (t1.Status != TaskStatus.RanToCompletion)
         {
-            G.Channel.RemoveObserver(observer);
+            G.Communicator.ObserverRegistry.Remove(observer);
             DestroyObject(go);
-            UiMessageBox.ShowMessageBox("Enter room error:\n" + t1.Exception.ToString());
+            UiMessageBox.ShowMessageBox("Enter room error:\n" + t1.Exception);
             yield break;
         }
 
         // Spawn new room item
 
         var occupant = (OccupantRef)t1.Result.Item1;
+        if (occupant.IsChannelConnected() == false)
+        {
+            yield return occupant.ConnectChannelAsync().WaitHandle;
+        }
         chatPanel.SetOccupant(occupant);
         chatPanel.SetRoomInfo(t1.Result.Item2);
         chatPanel.ExitButtonClicked = () => OnRoomExitClick(roomName);
@@ -185,11 +192,24 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
         {
             ChatPanel = chatPanel,
             Occupant = occupant,
-            Observer = (RoomObserver)observer
+            Observer = (RoomObserver)observer,
+            Channel = (IChannel)occupant.RequestWaiter
         };
         _roomItemMap.Add(roomName, item);
         ControlPanel.AddRoomItem(roomName);
         observer.GetEventDispatcher().Pending = false;
+
+        item.Channel.StateChanged += (_, state) =>
+        {
+            ChannelEventDispatcher.Post(o =>
+            {
+                if (state == ChannelStateType.Closed)
+                {
+                    if (_roomItemMap.ContainsKey(roomName))
+                        OnRoomExitClick(roomName);
+                }
+            });
+        };
 
         // Select
 
@@ -234,8 +254,10 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
             _roomItemMap.Remove(roomName);
             Destroy(item.ChatPanel.gameObject);
-            G.Channel.RemoveObserver(item.Observer);
+            G.Communicator.ObserverRegistry.Remove(item.Observer);
             ControlPanel.DeleteRoomItem(roomName);
+            if (item.Channel != G.Communicator.Channel)
+                item.Channel.Close();
 
             OnRoomItemClick("#general");
         }
