@@ -1,5 +1,8 @@
 # Chatty
 
+[![Build status](https://ci.appveyor.com/api/projects/status/8o9itepr69a83tf2?svg=true)](https://ci.appveyor.com/project/veblush/chatty)
+[![Coverage Status](https://coveralls.io/repos/github/SaladLab/Chatty/badge.svg?branch=master)](https://coveralls.io/github/SaladLab/Chatty?branch=master)
+
 Reference chatting application for using Akka.Interfaced and Akka.Interfaced.SlimSocket.
 
 ![Screenshot](https://raw.githubusercontent.com/SaladLab/Chatty/master/docs/ScreenShot.jpg)
