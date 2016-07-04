@@ -19,6 +19,9 @@ namespace TalkServer
 
             _clusterContext.ClusterActorDiscovery.Tell(
                 new ClusterActorDiscoveryMessage.MonitorActor("Room"), Self);
+
+            _clusterContext.ClusterActorDiscovery.Tell(
+                new ClusterActorDiscoveryMessage.MonitorActor("Bot"), Self);
         }
 
         [MessageHandler]
@@ -27,11 +30,15 @@ namespace TalkServer
             switch (m.Tag)
             {
                 case "User":
-                    _clusterContext.UserTable = m.Actor;
+                    _clusterContext.UserTable = new DistributedActorTableRef<string>(m.Actor);
                     break;
 
                 case "Room":
-                    _clusterContext.RoomTable = m.Actor;
+                    _clusterContext.RoomTable = new DistributedActorTableRef<string>(m.Actor);
+                    break;
+
+                case "Bot":
+                    _clusterContext.BotTable = new DistributedActorTableRef<long>(m.Actor);
                     break;
             }
         }
@@ -47,6 +54,10 @@ namespace TalkServer
 
                 case "Room":
                     _clusterContext.RoomTable = null;
+                    break;
+
+                case "Bot":
+                    _clusterContext.BotTable = null;
                     break;
             }
         }

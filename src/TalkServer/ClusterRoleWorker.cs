@@ -85,9 +85,9 @@ namespace TalkServer
             // create UserTableContainer
 
             _userContainer = Context.System.ActorOf(
-                Props.Create(() => new DistributedActorTableContainer<string>("User", Context.ClusterActorDiscovery, null, null)),
+                Props.Create(() => new DistributedActorTableContainer<string>("User", Context.ClusterActorDiscovery, null, null, InterfacedPoisonPill.Instance)),
                 "UserTableContainer");
-            Context.UserTableContainer = _userContainer;
+            Context.UserTableContainer = new DistributedActorTableContainerRef<string>(_userContainer, TimeSpan.FromSeconds(10));
 
             // create gateway for users to connect to
 
@@ -100,7 +100,7 @@ namespace TalkServer
                 {
                     ListenEndPoint = _listenEndPoint,
                     GatewayLogger = LogManager.GetLogger(name),
-                    CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
+                    CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep})"),
                     ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
                     PacketSerializer = serializer,
                     CreateInitialActors = (context, connection) => new[]
@@ -159,7 +159,6 @@ namespace TalkServer
             await _roomTable.GracefulStop(
                 TimeSpan.FromMinutes(1),
                 new DistributedActorTableMessage<string>.GracefulStop(InterfacedPoisonPill.Instance));
-            _roomTable = null;
         }
     }
 
@@ -186,9 +185,8 @@ namespace TalkServer
 
             _roomContainer = Context.System.ActorOf(
                 Props.Create(() => new DistributedActorTableContainer<string>(
-                    "Room", Context.ClusterActorDiscovery, typeof(RoomActorFactory), new object[] { Context })),
+                    "Room", Context.ClusterActorDiscovery, typeof(RoomActorFactory), new object[] { Context }, InterfacedPoisonPill.Instance)),
                 "RoomTableContainer");
-            Context.RoomTableContainer = _roomContainer;
 
             // create a gateway for users to join room
 
@@ -204,7 +202,7 @@ namespace TalkServer
                     GatewayLogger = LogManager.GetLogger(name),
                     TokenRequired = true,
                     TokenTimeout = TimeSpan.FromMinutes(1),
-                    CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
+                    CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep})"),
                     ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
                     PacketSerializer = serializer,
                 };
@@ -244,10 +242,37 @@ namespace TalkServer
         }
     }
 
+    [RoleWorker("BotTable")]
+    public class BotTableWorker : ClusterRoleWorker
+    {
+        private IActorRef _botTable;
+
+        public BotTableWorker(ClusterNodeContext context, Config config)
+            : base(context)
+        {
+        }
+
+        public override Task Start()
+        {
+            _botTable = Context.System.ActorOf(
+                Props.Create(() => new DistributedActorTable<long>("Bot", Context.ClusterActorDiscovery, typeof(IncrementalIntegerIdGenerator), null)),
+                "BotTable");
+
+            return Task.FromResult(true);
+        }
+
+        public override async Task Stop()
+        {
+            await _botTable.GracefulStop(
+                TimeSpan.FromMinutes(1),
+                new DistributedActorTableMessage<long>.GracefulStop(InterfacedPoisonPill.Instance));
+        }
+    }
+
     [RoleWorker("Bot")]
     public class BotWorker : ClusterRoleWorker
     {
-        private IActorRef _botCommander;
+        private IActorRef _botContainer;
 
         public BotWorker(ClusterNodeContext context, Config config)
             : base(context)
@@ -256,18 +281,33 @@ namespace TalkServer
 
         public override Task Start()
         {
-            // create commander actor
-
-            _botCommander = Context.System.ActorOf(
-                Props.Create(() => new ChatBotCommanderActor(Context)), "ChatBotCommander");
-            _botCommander.Tell(new ChatBotCommanderMessage.Start());
+            _botContainer = Context.System.ActorOf(
+                Props.Create(() => new DistributedActorTableContainer<long>(
+                    "Bot", Context.ClusterActorDiscovery, typeof(BotActorFactory), new object[] { Context }, InterfacedPoisonPill.Instance)),
+                "BotTableContainer");
 
             return Task.FromResult(true);
         }
 
         public override async Task Stop()
         {
-            await _botCommander.GracefulStop(TimeSpan.FromSeconds(10), new ChatBotCommanderMessage.Stop());
+            await _botContainer.GracefulStop(TimeSpan.FromSeconds(10), PoisonPill.Instance);
+        }
+    }
+
+    public class BotActorFactory : IActorFactory
+    {
+        private ClusterNodeContext _clusterContext;
+
+        public void Initialize(object[] args)
+        {
+            _clusterContext = (ClusterNodeContext)args[0];
+        }
+
+        public IActorRef CreateActor(IActorRefFactory actorRefFactory, object id, object[] args)
+        {
+            return actorRefFactory.ActorOf(Props.Create(() =>
+                new BotActor(_clusterContext, "bot" + (long)id, (string)args[0], (Type)args[1])));
         }
     }
 }

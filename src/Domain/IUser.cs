@@ -12,6 +12,7 @@ namespace Domain
         Task<Tuple<IOccupant, RoomInfo>> EnterRoom(string name, IRoomObserver observer);
         Task ExitFromRoom(string name);
         Task Whisper(string targetUserId, string message);
+        Task CreateBot(string roomName, string botType);
     }
 
     public interface IUserMessasing : IInterfacedActor

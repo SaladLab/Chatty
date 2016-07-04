@@ -98,8 +98,8 @@ namespace Domain
         public class Invite_Invoke
             : IInterfacedPayload, IAsyncInvokable, IPayloadTagOverridable
         {
-            [ProtoMember(1)] public System.String targetUserId;
-            [ProtoMember(2)] public System.String senderUserId;
+            [ProtoMember(1)] public string targetUserId;
+            [ProtoMember(2)] public string senderUserId;
 
             public Type GetInterfaceType()
             {
@@ -113,7 +113,7 @@ namespace Domain
 
             void IPayloadTagOverridable.SetTag(object value)
             {
-                senderUserId = (System.String)value;
+                senderUserId = (string)value;
             }
         }
 
@@ -121,8 +121,8 @@ namespace Domain
         public class Say_Invoke
             : IInterfacedPayload, IAsyncInvokable, IPayloadTagOverridable
         {
-            [ProtoMember(1)] public System.String msg;
-            [ProtoMember(2)] public System.String senderUserId;
+            [ProtoMember(1)] public string msg;
+            [ProtoMember(2)] public string senderUserId;
 
             public Type GetInterfaceType()
             {
@@ -136,7 +136,7 @@ namespace Domain
 
             void IPayloadTagOverridable.SetTag(object value)
             {
-                senderUserId = (System.String)value;
+                senderUserId = (string)value;
             }
         }
     }
@@ -144,8 +144,8 @@ namespace Domain
     public interface IOccupant_NoReply
     {
         void GetHistory();
-        void Invite(System.String targetUserId, System.String senderUserId = null);
-        void Say(System.String msg, System.String senderUserId = null);
+        void Invite(string targetUserId, string senderUserId = null);
+        void Say(string msg, string senderUserId = null);
     }
 
     public class OccupantRef : InterfacedActorRef, IOccupant, IOccupant_NoReply
@@ -187,7 +187,7 @@ namespace Domain
             return SendRequestAndReceive<System.Collections.Generic.IList<Domain.ChatItem>>(requestMessage);
         }
 
-        public Task Invite(System.String targetUserId, System.String senderUserId = null)
+        public Task Invite(string targetUserId, string senderUserId = null)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IOccupant_PayloadTable.Invite_Invoke { targetUserId = targetUserId, senderUserId = senderUserId }
@@ -195,7 +195,7 @@ namespace Domain
             return SendRequestAndWait(requestMessage);
         }
 
-        public Task Say(System.String msg, System.String senderUserId = null)
+        public Task Say(string msg, string senderUserId = null)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IOccupant_PayloadTable.Say_Invoke { msg = msg, senderUserId = senderUserId }
@@ -211,7 +211,7 @@ namespace Domain
             SendRequest(requestMessage);
         }
 
-        void IOccupant_NoReply.Invite(System.String targetUserId, System.String senderUserId)
+        void IOccupant_NoReply.Invite(string targetUserId, string senderUserId)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IOccupant_PayloadTable.Invite_Invoke { targetUserId = targetUserId, senderUserId = senderUserId }
@@ -219,7 +219,7 @@ namespace Domain
             SendRequest(requestMessage);
         }
 
-        void IOccupant_NoReply.Say(System.String msg, System.String senderUserId)
+        void IOccupant_NoReply.Say(string msg, string senderUserId)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IOccupant_PayloadTable.Say_Invoke { msg = msg, senderUserId = senderUserId }
@@ -260,6 +260,7 @@ namespace Domain
         public static Type[,] GetPayloadTypes()
         {
             return new Type[,] {
+                { typeof(CreateBot_Invoke), null },
                 { typeof(EnterRoom_Invoke), typeof(EnterRoom_Return) },
                 { typeof(ExitFromRoom_Invoke), null },
                 { typeof(GetId_Invoke), typeof(GetId_Return) },
@@ -269,10 +270,28 @@ namespace Domain
         }
 
         [ProtoContract, TypeAlias]
+        public class CreateBot_Invoke
+            : IInterfacedPayload, IAsyncInvokable
+        {
+            [ProtoMember(1)] public string roomName;
+            [ProtoMember(2)] public string botType;
+
+            public Type GetInterfaceType()
+            {
+                return typeof(IUser);
+            }
+
+            public Task<IValueGetable> InvokeAsync(object __target)
+            {
+                return null;
+            }
+        }
+
+        [ProtoContract, TypeAlias]
         public class EnterRoom_Invoke
             : IInterfacedPayload, IAsyncInvokable, IPayloadObserverUpdatable
         {
-            [ProtoMember(1)] public System.String name;
+            [ProtoMember(1)] public string name;
             [ProtoMember(2)] public Domain.IRoomObserver observer;
 
             public Type GetInterfaceType()
@@ -323,7 +342,7 @@ namespace Domain
         public class ExitFromRoom_Invoke
             : IInterfacedPayload, IAsyncInvokable
         {
-            [ProtoMember(1)] public System.String name;
+            [ProtoMember(1)] public string name;
 
             public Type GetInterfaceType()
             {
@@ -355,7 +374,7 @@ namespace Domain
         public class GetId_Return
             : IInterfacedPayload, IValueGetable
         {
-            [ProtoMember(1)] public System.String v;
+            [ProtoMember(1)] public string v;
 
             public Type GetInterfaceType()
             {
@@ -387,7 +406,7 @@ namespace Domain
         public class GetRoomList_Return
             : IInterfacedPayload, IValueGetable
         {
-            [ProtoMember(1)] public System.Collections.Generic.IList<System.String> v;
+            [ProtoMember(1)] public System.Collections.Generic.IList<string> v;
 
             public Type GetInterfaceType()
             {
@@ -404,8 +423,8 @@ namespace Domain
         public class Whisper_Invoke
             : IInterfacedPayload, IAsyncInvokable
         {
-            [ProtoMember(1)] public System.String targetUserId;
-            [ProtoMember(2)] public System.String message;
+            [ProtoMember(1)] public string targetUserId;
+            [ProtoMember(2)] public string message;
 
             public Type GetInterfaceType()
             {
@@ -421,11 +440,12 @@ namespace Domain
 
     public interface IUser_NoReply
     {
-        void EnterRoom(System.String name, Domain.IRoomObserver observer);
-        void ExitFromRoom(System.String name);
+        void CreateBot(string roomName, string botType);
+        void EnterRoom(string name, Domain.IRoomObserver observer);
+        void ExitFromRoom(string name);
         void GetId();
         void GetRoomList();
-        void Whisper(System.String targetUserId, System.String message);
+        void Whisper(string targetUserId, string message);
     }
 
     public class UserRef : InterfacedActorRef, IUser, IUser_NoReply
@@ -459,7 +479,15 @@ namespace Domain
             return new UserRef(Target, RequestWaiter, timeout);
         }
 
-        public Task<System.Tuple<Domain.IOccupant, Domain.RoomInfo>> EnterRoom(System.String name, Domain.IRoomObserver observer)
+        public Task CreateBot(string roomName, string botType)
+        {
+            var requestMessage = new RequestMessage {
+                InvokePayload = new IUser_PayloadTable.CreateBot_Invoke { roomName = roomName, botType = botType }
+            };
+            return SendRequestAndWait(requestMessage);
+        }
+
+        public Task<System.Tuple<Domain.IOccupant, Domain.RoomInfo>> EnterRoom(string name, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observer = (RoomObserver)observer }
@@ -467,7 +495,7 @@ namespace Domain
             return SendRequestAndReceive<System.Tuple<Domain.IOccupant, Domain.RoomInfo>>(requestMessage);
         }
 
-        public Task ExitFromRoom(System.String name)
+        public Task ExitFromRoom(string name)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.ExitFromRoom_Invoke { name = name }
@@ -475,23 +503,23 @@ namespace Domain
             return SendRequestAndWait(requestMessage);
         }
 
-        public Task<System.String> GetId()
+        public Task<string> GetId()
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.GetId_Invoke {  }
             };
-            return SendRequestAndReceive<System.String>(requestMessage);
+            return SendRequestAndReceive<string>(requestMessage);
         }
 
-        public Task<System.Collections.Generic.IList<System.String>> GetRoomList()
+        public Task<System.Collections.Generic.IList<string>> GetRoomList()
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.GetRoomList_Invoke {  }
             };
-            return SendRequestAndReceive<System.Collections.Generic.IList<System.String>>(requestMessage);
+            return SendRequestAndReceive<System.Collections.Generic.IList<string>>(requestMessage);
         }
 
-        public Task Whisper(System.String targetUserId, System.String message)
+        public Task Whisper(string targetUserId, string message)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.Whisper_Invoke { targetUserId = targetUserId, message = message }
@@ -499,7 +527,15 @@ namespace Domain
             return SendRequestAndWait(requestMessage);
         }
 
-        void IUser_NoReply.EnterRoom(System.String name, Domain.IRoomObserver observer)
+        void IUser_NoReply.CreateBot(string roomName, string botType)
+        {
+            var requestMessage = new RequestMessage {
+                InvokePayload = new IUser_PayloadTable.CreateBot_Invoke { roomName = roomName, botType = botType }
+            };
+            SendRequest(requestMessage);
+        }
+
+        void IUser_NoReply.EnterRoom(string name, Domain.IRoomObserver observer)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.EnterRoom_Invoke { name = name, observer = (RoomObserver)observer }
@@ -507,7 +543,7 @@ namespace Domain
             SendRequest(requestMessage);
         }
 
-        void IUser_NoReply.ExitFromRoom(System.String name)
+        void IUser_NoReply.ExitFromRoom(string name)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.ExitFromRoom_Invoke { name = name }
@@ -531,7 +567,7 @@ namespace Domain
             SendRequest(requestMessage);
         }
 
-        void IUser_NoReply.Whisper(System.String targetUserId, System.String message)
+        void IUser_NoReply.Whisper(string targetUserId, string message)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUser_PayloadTable.Whisper_Invoke { targetUserId = targetUserId, message = message }
@@ -580,8 +616,8 @@ namespace Domain
         public class Login_Invoke
             : IInterfacedPayload, IAsyncInvokable, IPayloadObserverUpdatable
         {
-            [ProtoMember(1)] public System.String id;
-            [ProtoMember(2)] public System.String password;
+            [ProtoMember(1)] public string id;
+            [ProtoMember(2)] public string password;
             [ProtoMember(3)] public Domain.IUserEventObserver observer;
 
             public Type GetInterfaceType()
@@ -631,7 +667,7 @@ namespace Domain
 
     public interface IUserLogin_NoReply
     {
-        void Login(System.String id, System.String password, Domain.IUserEventObserver observer);
+        void Login(string id, string password, Domain.IUserEventObserver observer);
     }
 
     public class UserLoginRef : InterfacedActorRef, IUserLogin, IUserLogin_NoReply
@@ -665,7 +701,7 @@ namespace Domain
             return new UserLoginRef(Target, RequestWaiter, timeout);
         }
 
-        public Task<Domain.IUser> Login(System.String id, System.String password, Domain.IUserEventObserver observer)
+        public Task<Domain.IUser> Login(string id, string password, Domain.IUserEventObserver observer)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observer = (UserEventObserver)observer }
@@ -673,7 +709,7 @@ namespace Domain
             return SendRequestAndReceive<Domain.IUser>(requestMessage);
         }
 
-        void IUserLogin_NoReply.Login(System.String id, System.String password, Domain.IUserEventObserver observer)
+        void IUserLogin_NoReply.Login(string id, string password, Domain.IUserEventObserver observer)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUserLogin_PayloadTable.Login_Invoke { id = id, password = password, observer = (UserEventObserver)observer }
@@ -723,8 +759,8 @@ namespace Domain
         public class Invite_Invoke
             : IInterfacedPayload, IAsyncInvokable
         {
-            [ProtoMember(1)] public System.String invitorUserId;
-            [ProtoMember(2)] public System.String roomName;
+            [ProtoMember(1)] public string invitorUserId;
+            [ProtoMember(2)] public string roomName;
 
             public Type GetInterfaceType()
             {
@@ -757,7 +793,7 @@ namespace Domain
 
     public interface IUserMessasing_NoReply
     {
-        void Invite(System.String invitorUserId, System.String roomName);
+        void Invite(string invitorUserId, string roomName);
         void Whisper(Domain.ChatItem chatItem);
     }
 
@@ -792,7 +828,7 @@ namespace Domain
             return new UserMessasingRef(Target, RequestWaiter, timeout);
         }
 
-        public Task Invite(System.String invitorUserId, System.String roomName)
+        public Task Invite(string invitorUserId, string roomName)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUserMessasing_PayloadTable.Invite_Invoke { invitorUserId = invitorUserId, roomName = roomName }
@@ -808,7 +844,7 @@ namespace Domain
             return SendRequestAndWait(requestMessage);
         }
 
-        void IUserMessasing_NoReply.Invite(System.String invitorUserId, System.String roomName)
+        void IUserMessasing_NoReply.Invite(string invitorUserId, string roomName)
         {
             var requestMessage = new RequestMessage {
                 InvokePayload = new IUserMessasing_PayloadTable.Invite_Invoke { invitorUserId = invitorUserId, roomName = roomName }
@@ -889,7 +925,7 @@ namespace Domain
         [ProtoContract, TypeAlias]
         public class Enter_Invoke : IInterfacedPayload, IInvokable
         {
-            [ProtoMember(1)] public System.String userId;
+            [ProtoMember(1)] public string userId;
 
             public Type GetInterfaceType()
             {
@@ -905,7 +941,7 @@ namespace Domain
         [ProtoContract, TypeAlias]
         public class Exit_Invoke : IInterfacedPayload, IInvokable
         {
-            [ProtoMember(1)] public System.String userId;
+            [ProtoMember(1)] public string userId;
 
             public Type GetInterfaceType()
             {
@@ -947,13 +983,13 @@ namespace Domain
         {
         }
 
-        public void Enter(System.String userId)
+        public void Enter(string userId)
         {
             var payload = new IRoomObserver_PayloadTable.Enter_Invoke { userId = userId };
             Notify(payload);
         }
 
-        public void Exit(System.String userId)
+        public void Exit(string userId)
         {
             var payload = new IRoomObserver_PayloadTable.Exit_Invoke { userId = userId };
             Notify(payload);
@@ -1008,8 +1044,8 @@ namespace Domain
         [ProtoContract, TypeAlias]
         public class Invite_Invoke : IInterfacedPayload, IInvokable
         {
-            [ProtoMember(1)] public System.String invitorUserId;
-            [ProtoMember(2)] public System.String roomName;
+            [ProtoMember(1)] public string invitorUserId;
+            [ProtoMember(2)] public string roomName;
 
             public Type GetInterfaceType()
             {
@@ -1051,7 +1087,7 @@ namespace Domain
         {
         }
 
-        public void Invite(System.String invitorUserId, System.String roomName)
+        public void Invite(string invitorUserId, string roomName)
         {
             var payload = new IUserEventObserver_PayloadTable.Invite_Invoke { invitorUserId = invitorUserId, roomName = roomName };
             Notify(payload);

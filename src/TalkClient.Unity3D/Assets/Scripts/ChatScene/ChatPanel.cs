@@ -85,6 +85,13 @@ public class ChatPanel : MonoBehaviour, IRoomObserver
                     StartCoroutine(ProcessWhisper(words[1], string.Join(" ", words.Skip(2).ToArray())));
                         break;
 
+                case "b":
+                case "bot":
+                    if (words.Length < 2)
+                        break;
+                    StartCoroutine(ProcessBot(words[1]));
+                    break;
+
                 default:
                     AppendChatMessage(string.Format("***** Illegal command: {0}", command));
                     break;
@@ -118,6 +125,17 @@ public class ChatPanel : MonoBehaviour, IRoomObserver
             AppendChatMessage(string.Format("***** Succeeded to whisper to {0}", targetUserId));
         else
             AppendChatMessage(string.Format("***** Failed to whisper {0} ({1})", targetUserId, t1.Exception));
+    }
+
+    private IEnumerator ProcessBot(string type)
+    {
+        var t1 = G.User.CreateBot(_roomInfo.Name, type);
+        yield return t1.WaitHandle;
+
+        if (t1.Status == TaskStatus.RanToCompletion)
+            AppendChatMessage(string.Format("***** Succeeded to create a bot of {0}", type));
+        else
+            AppendChatMessage(string.Format("***** Failed to create a bot of {0} ({1})", type, t1.Exception));
     }
 
     public void AppendChatMessage(string text)

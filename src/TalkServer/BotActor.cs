@@ -2,7 +2,6 @@
 using System.Net;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Akka.Interfaced.SlimServer;
 using Common.Logging;
@@ -10,44 +9,37 @@ using Domain;
 
 namespace TalkServer
 {
-    public static class ChatBotMessage
+    public class BotActor : InterfacedActor, IActorBoundChannelSync, IUserEventObserverAsync, IRoomObserverAsync, IBotService
     {
-        public class Start
+        private readonly ILog _log;
+        private readonly ClusterNodeContext _clusterContext;
+        private BotPattern.Context _patternContext;
+        private BotPattern _pattern;
+        private UserRef _user;
+        private OccupantRef _occupant;
+        private ICancelable _timerCancelable;
+
+        internal class StartMessage
         {
             public string UserId;
             public string RoomName;
             public Type PatternType;
         }
 
-        public class Stop
+        internal class TimerMessage
         {
         }
 
-        internal class Timer
-        {
-        }
-    }
-
-    public class ChatBotActor : InterfacedActor, IActorBoundChannelSync, IUserEventObserverAsync, IRoomObserverAsync, IChatBotService
-    {
-        private readonly ILog _log;
-        private readonly ClusterNodeContext _clusterContext;
-        private ChatBotPattern.Context _patternContext;
-        private ChatBotPattern _pattern;
-        private UserRef _user;
-        private OccupantRef _occupant;
-        private ICancelable _timerCancelable;
-        private bool _stopped;
-
-        public ChatBotActor(ClusterNodeContext clusterContext, string name)
+        public BotActor(ClusterNodeContext clusterContext, string name, string roomName, Type patternType)
         {
             _log = LogManager.GetLogger($"Bot({name})");
             _clusterContext = clusterContext;
+            Self.Tell(new StartMessage { UserId = name, RoomName = roomName, PatternType = patternType });
         }
 
         protected override void PostStop()
         {
-            ((IChatBotService)this).RemoveTimer();
+            ((IBotService)this).RemoveTimer();
 
             if (_user != null)
                 _user.CastToIActorRef().Tell(InterfacedPoisonPill.Instance);
@@ -56,40 +48,38 @@ namespace TalkServer
         }
 
         [MessageHandler, Reentrant]
-        private async Task Handle(ChatBotMessage.Start m)
+        private async Task Handle(StartMessage m)
         {
             if (_user != null)
                 throw new InvalidOperationException("Already started");
 
             // create bot pattern
 
-            _patternContext = new ChatBotPattern.Context
+            _patternContext = new BotPattern.Context
             {
                 UserId = m.UserId,
                 RoomName = m.RoomName,
                 Service = this
             };
-            _pattern = (ChatBotPattern)Activator.CreateInstance(m.PatternType, new object[] { _patternContext });
+            _pattern = (BotPattern)Activator.CreateInstance(m.PatternType, new object[] { _patternContext });
 
             // login by itself
 
-            var userLogin = Context.ActorOf(Props.Create(() => new UserLoginActor(_clusterContext, Self.Cast<ActorBoundChannelRef>(), new IPEndPoint(IPAddress.Loopback, 0))))
+            var userLogin = Context.ActorOf(Props.Create(() => new UserLoginActor(_clusterContext, Self.Cast<ActorBoundChannelRef>(), new IPEndPoint(IPAddress.None, 0))))
                                    .Cast<UserLoginRef>().WithRequestWaiter(this);
             await userLogin.Login(m.UserId, m.UserId, CreateObserver<IUserEventObserver>());
 
             // enter room
 
             await _user.EnterRoom(m.RoomName, CreateObserver<IRoomObserver>());
+
+            // start bot
+
+            await _pattern.OnStart();
         }
 
         [MessageHandler]
-        private void Handle(ChatBotMessage.Stop m)
-        {
-            Self.Tell(InterfacedPoisonPill.Instance);
-        }
-
-        [MessageHandler]
-        private Task Handle(ChatBotMessage.Timer m)
+        private Task Handle(TimerMessage m)
         {
             return (_pattern != null) ? _pattern.OnTimer() : Task.FromResult(true);
         }
@@ -150,7 +140,6 @@ namespace TalkServer
 
         void IActorBoundChannelSync.Close()
         {
-            _stopped = true;
         }
 
         Task IUserEventObserverAsync.Invite(string invitorUserId, string roomName)
@@ -178,20 +167,28 @@ namespace TalkServer
             return (_pattern != null && chatItem.UserId != _patternContext.UserId) ? _pattern.OnSay(chatItem) : Task.FromResult(true);
         }
 
-        async Task IChatBotService.SayAsync(string message)
+        async Task IBotService.SayAsync(string message)
         {
             if (_occupant != null)
                 await _occupant.Say(message, _patternContext.UserId);
         }
 
-        async Task<bool> IChatBotService.WhisperToAsync(string targetUserId, string message)
+        async Task<bool> IBotService.WhisperToAsync(string targetUserId, string message)
         {
             if (_clusterContext.UserTable == null)
                 return false;
 
-            var reply = await _clusterContext.UserTable.Ask<DistributedActorTableMessage<string>.GetReply>(
-                new DistributedActorTableMessage<string>.Get(targetUserId));
-            var targetUser = reply.Actor;
+            IActorRef targetUser;
+            try
+            {
+                var reply = await _clusterContext.UserTable.Get(targetUserId);
+                targetUser = reply.Actor;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
             if (targetUser == null)
                 return false;
 
@@ -204,19 +201,24 @@ namespace TalkServer
             return true;
         }
 
-        void IChatBotService.SetTimer(TimeSpan duration)
+        void IBotService.SetTimer(TimeSpan duration)
         {
-            ((IChatBotService)this).RemoveTimer();
-            _timerCancelable = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(duration, duration, Self, new ChatBotMessage.Timer(), Self);
+            ((IBotService)this).RemoveTimer();
+            _timerCancelable = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(duration, duration, Self, new TimerMessage(), Self);
         }
 
-        void IChatBotService.RemoveTimer()
+        void IBotService.RemoveTimer()
         {
             if (_timerCancelable != null)
             {
                 _timerCancelable.Cancel();
                 _timerCancelable = null;
             }
+        }
+
+        void IBotService.Kill()
+        {
+            Self.Tell(InterfacedPoisonPill.Instance);
         }
     }
 }

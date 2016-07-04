@@ -166,9 +166,18 @@ namespace TalkServer
             if (_userMap.ContainsKey(targetUserId))
                 throw new ResultException(ResultCodeType.UserAlreadyHere);
 
-            var reply = await _clusterContext.UserTable.Ask<DistributedActorTableMessage<string>.GetReply>(
-                new DistributedActorTableMessage<string>.Get(targetUserId));
-            var targetUser = reply.Actor;
+            IActorRef targetUser;
+            try
+            {
+                var reply = await _clusterContext.UserTable.Get(targetUserId);
+                targetUser = reply.Actor;
+            }
+            catch (Exception e)
+            {
+                _logger.Warn($"Failed in querying target user from UserTable. (TargetUserId={targetUserId})", e);
+                throw new ResultException(ResultCodeType.InternalError);
+            }
+
             if (targetUser == null)
                 throw new ResultException(ResultCodeType.UserNotOnline);
 

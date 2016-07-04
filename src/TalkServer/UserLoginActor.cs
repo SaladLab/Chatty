@@ -2,7 +2,6 @@
 using System.Net;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Akka.Interfaced.LogFilter;
 using Akka.Interfaced.SlimServer;
@@ -18,12 +17,14 @@ namespace TalkServer
         private readonly ILog _logger;
         private readonly ClusterNodeContext _clusterContext;
         private readonly ActorBoundChannelRef _channel;
+        private readonly bool _isBot;
 
-        public UserLoginActor(ClusterNodeContext clusterContext, ActorBoundChannelRef channel, EndPoint clientRemoteEndPoint)
+        public UserLoginActor(ClusterNodeContext clusterContext, ActorBoundChannelRef channel, IPEndPoint clientRemoteEndPoint)
         {
             _logger = LogManager.GetLogger($"UserLoginActor({clientRemoteEndPoint})");
             _clusterContext = clusterContext;
             _channel = channel;
+            _isBot = clientRemoteEndPoint.Address == IPAddress.None;
         }
 
         async Task<IUser> IUserLogin.Login(string id, string password, IUserEventObserver observer)
@@ -33,10 +34,16 @@ namespace TalkServer
             if (string.IsNullOrEmpty(password))
                 throw new ResultException(ResultCodeType.ArgumentError);
 
-            // Check password
+            // Check account
 
-            if (await Authenticator.AuthenticateAsync(id, password) == false)
-                throw new ResultException(ResultCodeType.LoginFailedIncorrectPassword);
+            if (_isBot == false)
+            {
+                if (id.ToLower().StartsWith("bot"))
+                    throw new ResultException(ResultCodeType.LoginFailedIncorrectPassword);
+
+                if (await Authenticator.AuthenticateAsync(id, password) == false)
+                    throw new ResultException(ResultCodeType.LoginFailedIncorrectPassword);
+            }
 
             // Make UserActor
 
@@ -57,8 +64,7 @@ namespace TalkServer
             var registered = false;
             for (int i = 0; i < 10; i++)
             {
-                var reply = await _clusterContext.UserTableContainer.Ask<DistributedActorTableMessage<string>.AddReply>(
-                    new DistributedActorTableMessage<string>.Add(id, user), TimeSpan.FromSeconds(10));
+                var reply = await _clusterContext.UserTableContainer.Add(id, user);
                 if (reply.Added)
                 {
                     registered = true;

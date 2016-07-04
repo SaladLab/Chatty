@@ -1,4 +1,5 @@
 ﻿using Akka.Actor;
+using Akka.Cluster.Utility;
 
 namespace TalkServer
 {
@@ -10,9 +11,9 @@ namespace TalkServer
 
         // quick access point for actors. but these are shared variables.
         // if there is a neat way to avoid this dirty hack, please improve it.
-        public IActorRef UserTable;
-        public IActorRef UserTableContainer;
-        public IActorRef RoomTable;
-        public IActorRef RoomTableContainer;
+        public DistributedActorTableRef<string> UserTable;
+        public DistributedActorTableContainerRef<string> UserTableContainer;
+        public DistributedActorTableRef<string> RoomTable;
+        public DistributedActorTableRef<long> BotTable;
     }
 }

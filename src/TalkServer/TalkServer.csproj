@@ -79,6 +79,10 @@
       <HintPath>..\..\packages\Akka.Interfaced.SlimSocket.Server.0.4.2-beta\lib\net45\Akka.Interfaced.SlimSocket.Server.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Akka.Logger.CommonLogging, Version=1.0.8.3, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Akka.Logger.CommonLogging.1.0.8\lib\net45\Akka.Logger.CommonLogging.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Akka.Remote, Version=1.0.8.24, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Akka.Remote.1.0.8\lib\net45\Akka.Remote.dll</HintPath>
       <Private>True</Private>
@@ -167,9 +171,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Authenticator.cs" />
-    <Compile Include="ChatBotActor.cs" />
-    <Compile Include="ChatBotCommanderActor.cs" />
-    <Compile Include="ChatBotPattern.cs" />
+    <Compile Include="BotActor.cs" />
+    <Compile Include="BotPattern.cs" />
     <Compile Include="ClusterNodeContext.cs" />
     <Compile Include="ClusterNodeContextUpdater.cs" />
     <Compile Include="ClusterRoleWorker.cs" />

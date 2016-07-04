@@ -54,9 +54,16 @@ namespace TalkServer
 
         async Task<IList<string>> IUser.GetRoomList()
         {
-            var reply = await _clusterContext.RoomTable.Ask<DistributedActorTableMessage<string>.GetIdsReply>(
-                new DistributedActorTableMessage<string>.GetIds());
-            return reply.Ids?.ToList();
+            try
+            {
+                var reply = await _clusterContext.RoomTable.GetIds();
+                return reply.Ids?.ToList();
+            }
+            catch (Exception e)
+            {
+                _logger.Warn($"Failed in querying room list from RoomTable.", e);
+                throw new ResultException(ResultCodeType.InternalError);
+            }
         }
 
         async Task<Tuple<IOccupant, RoomInfo>> IUser.EnterRoom(string name, IRoomObserver observer)
@@ -66,12 +73,22 @@ namespace TalkServer
 
             // Try to get room ref
 
-            var reply = await _clusterContext.RoomTable.Ask<DistributedActorTableMessage<string>.GetOrCreateReply>(
-                new DistributedActorTableMessage<string>.GetOrCreate(name, null));
-            if (reply.Actor == null)
+            IActorRef roomRef;
+            try
+            {
+                var reply = await _clusterContext.RoomTable.GetOrCreate(name, null);
+                roomRef = reply.Actor;
+            }
+            catch (Exception e)
+            {
+                _logger.Warn($"Failed in querying room from RoomTable. (Name={name})", e);
+                throw new ResultException(ResultCodeType.InternalError);
+            }
+
+            if (roomRef == null)
                 throw new ResultException(ResultCodeType.RoomRemoved);
 
-            var room = reply.Actor.Cast<RoomRef>().WithRequestWaiter(this);
+            var room = roomRef.Cast<RoomRef>().WithRequestWaiter(this);
 
             // Let's enter the room !
 
@@ -130,14 +147,27 @@ namespace TalkServer
             if (targetUserId == _id)
                 throw new ResultException(ResultCodeType.UserNotMyself);
 
+            // Try to get target user ref
+
             if (_clusterContext.UserTable == null)
                 throw new ResultException(ResultCodeType.UserNotOnline);
 
-            var reply = await _clusterContext.UserTable.Ask<DistributedActorTableMessage<string>.GetReply>(
-                new DistributedActorTableMessage<string>.Get(targetUserId));
-            var targetUser = reply.Actor;
+            IActorRef targetUser;
+            try
+            {
+                var reply = await _clusterContext.UserTable.Get(targetUserId);
+                targetUser = reply.Actor;
+            }
+            catch (Exception e)
+            {
+                _logger.Warn($"Failed in querying user from UserTable. (TargetUserId={targetUserId})", e);
+                throw new ResultException(ResultCodeType.InternalError);
+            }
+
             if (targetUser == null)
                 throw new ResultException(ResultCodeType.UserNotOnline);
+
+            // Whisper to target user
 
             targetUser.Cast<UserMessasingRef>().WithNoReply().Whisper(new ChatItem
             {
@@ -145,6 +175,34 @@ namespace TalkServer
                 Time = DateTime.UtcNow,
                 Message = message
             });
+        }
+
+        Task IUser.CreateBot(string roomName, string botType)
+        {
+            if (string.IsNullOrEmpty(roomName))
+                throw new ResultException(ResultCodeType.ArgumentError);
+            if (string.IsNullOrEmpty(botType))
+                throw new ResultException(ResultCodeType.ArgumentError);
+
+            RoomRef room;
+            if (_enteredRoomMap.TryGetValue(roomName, out room) == false)
+                throw new ResultException(ResultCodeType.NeedToBeInRoom);
+
+            // find bot type info
+
+            var type = GetType().Assembly.GetTypes()
+                                .Where(t => t.BaseType == typeof(BotPattern))
+                                .FirstOrDefault(t => t.Name.ToLower() == botType + "bot");
+
+            if (type == null)
+                throw new ResultException(ResultCodeType.ArgumentError);
+
+            // create bot
+
+            if (_clusterContext.BotTable != null)
+                _clusterContext.BotTable.Create(new object[] { roomName, type });
+
+            return Task.FromResult(0);
         }
 
         Task IUserMessasing.Whisper(ChatItem chatItem)

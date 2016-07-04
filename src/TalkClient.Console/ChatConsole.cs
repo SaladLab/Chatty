@@ -129,6 +129,11 @@ namespace TalkClient.Console
                             await OnCommandWhisper(words);
                             break;
 
+                        case "/b":
+                        case "/bot":
+                            await OnCommandBot(words);
+                            break;
+
                         case "/?":
                         case "/h":
                         case "/help":
@@ -281,6 +286,32 @@ namespace TalkClient.Console
             }
         }
 
+        private async Task OnCommandBot(params string[] words)
+        {
+            if (string.IsNullOrEmpty(_currentRoomName))
+            {
+                ConsoleUtil.Err("Need a room to create a bot");
+                return;
+            }
+
+            if (words.Length >= 2)
+            {
+                try
+                {
+                    var botType = words[1];
+                    await _user.CreateBot(_currentRoomName, botType);
+                }
+                catch (Exception e)
+                {
+                    ConsoleUtil.Err("Failed to create a bot: " + e);
+                }
+            }
+            else
+            {
+                ConsoleUtil.Sys("Not enough parameters");
+            }
+        }
+
         private void OnCommandShowHelp()
         {
             ConsoleUtil.Out("Commands:");
@@ -289,6 +320,7 @@ namespace TalkClient.Console
             ConsoleUtil.Out("  /c [channel] Show or set current channel     (alias: /current)");
             ConsoleUtil.Out("  /i user      Invite user                     (alias: /invite)");
             ConsoleUtil.Out("  /w user msg  Whisper to user                 (alias: /whisper)");
+            ConsoleUtil.Out("  /b type      Create bot (of type)            (alias: /bot)");
             ConsoleUtil.Out("  /q           Quit                            (alias: /quit)");
         }
 
