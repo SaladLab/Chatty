@@ -97,13 +97,15 @@ namespace TalkServer
             // Bind an room actor to channel
 
             BoundActorTarget boundActor = null;
-            if (_id.StartsWith("bot"))
+            if (_id.StartsWith("bot") || _id.StartsWith("test"))
             {
+                // link room and channel directly
                 boundActor = await _channel.BindActor(
                     room.CastToIActorRef(), new[] { new TaggedType(typeof(IOccupant), _id) });
             }
             else
             {
+                // grant the user to access a room actor via room local gateway
                 var roomGatewayPath = room.CastToIActorRef().Path.Root / "user" / "RoomGateway";
                 var roomGateway = await Context.System.ActorSelection(roomGatewayPath).ResolveOne(TimeSpan.FromSeconds(1));
                 boundActor = await roomGateway.Cast<ActorBoundGatewayRef>().OpenChannel(

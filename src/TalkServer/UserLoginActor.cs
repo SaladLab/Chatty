@@ -17,14 +17,14 @@ namespace TalkServer
         private readonly ILog _logger;
         private readonly ClusterNodeContext _clusterContext;
         private readonly ActorBoundChannelRef _channel;
-        private readonly bool _isBot;
+        private readonly bool _isInternalAccess;
 
         public UserLoginActor(ClusterNodeContext clusterContext, ActorBoundChannelRef channel, IPEndPoint clientRemoteEndPoint)
         {
             _logger = LogManager.GetLogger($"UserLoginActor({clientRemoteEndPoint})");
             _clusterContext = clusterContext;
             _channel = channel;
-            _isBot = clientRemoteEndPoint.Address == IPAddress.None;
+            _isInternalAccess = clientRemoteEndPoint.Address == IPAddress.None;
         }
 
         async Task<IUser> IUserLogin.Login(string id, string password, IUserEventObserver observer)
@@ -36,13 +36,21 @@ namespace TalkServer
 
             // Check account
 
-            if (_isBot == false)
+            if (_isInternalAccess == false)
             {
-                if (id.ToLower().StartsWith("bot"))
-                    throw new ResultException(ResultCodeType.LoginFailedIncorrectPassword);
+                if (id.ToLower().StartsWith("bot") || id.ToLower().StartsWith("test"))
+                    throw new ResultException(ResultCodeType.LoginFailedNoUser);
 
                 if (await Authenticator.AuthenticateAsync(id, password) == false)
                     throw new ResultException(ResultCodeType.LoginFailedIncorrectPassword);
+            }
+            else
+            {
+                if (id.ToLower().StartsWith("bot") == false && id.ToLower().StartsWith("test") == false)
+                {
+                    if (await Authenticator.AuthenticateAsync(id, password) == false)
+                        throw new ResultException(ResultCodeType.LoginFailedIncorrectPassword);
+                }
             }
 
             // Make UserActor

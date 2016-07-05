@@ -120,7 +120,7 @@ namespace TalkServer
                 return;
 
             if (chatItem.Message.Contains("bot?"))
-                await SayAsync($"Yes I'm a bot.");
+                await SayAsync("Yes I'm a bot.");
         }
     }
 

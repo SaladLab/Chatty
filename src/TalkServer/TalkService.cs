@@ -29,7 +29,8 @@ namespace TalkServer
 
             try
             {
-                RedisStorage.Instance = new RedisStorage("localhost");
+                var cstr = ConfigurationManager.ConnectionStrings["Redis"].ConnectionString;
+                RedisStorage.Instance = new RedisStorage(cstr);
             }
             catch (Exception e)
             {
