@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Aim.ClusterNode;
 using Akka.Actor;
 using Akka.Configuration;
 using Akka.Cluster.Utility;
@@ -15,44 +16,21 @@ using Domain;
 
 namespace TalkServer
 {
-    public abstract class ClusterRoleWorker
-    {
-        public ClusterNodeContext Context { get; }
-
-        public ClusterRoleWorker(ClusterNodeContext context)
-        {
-            Context = context;
-        }
-
-        public abstract Task Start();
-        public abstract Task Stop();
-    }
-
-    [AttributeUsage(System.AttributeTargets.Class)]
-    public class RoleWorkerAttribute : Attribute
-    {
-        public string Role { get; set; }
-
-        public RoleWorkerAttribute(string role)
-        {
-            Role = role;
-        }
-    }
-
-    [RoleWorker("UserTable")]
+    [ClusterRole("UserTable")]
     public class UserTableWorker : ClusterRoleWorker
     {
+        private ClusterNodeContext _context;
         private IActorRef _userTable;
 
         public UserTableWorker(ClusterNodeContext context, Config config)
-            : base(context)
         {
+            _context = context;
         }
 
         public override Task Start()
         {
-            _userTable = Context.System.ActorOf(
-                Props.Create(() => new DistributedActorTable<string>("User", Context.ClusterActorDiscovery, null, null)),
+            _userTable = _context.System.ActorOf(
+                Props.Create(() => new DistributedActorTable<string>("User", _context.ClusterActorDiscovery, null, null)),
                 "UserTable");
             return Task.FromResult(true);
         }
@@ -65,17 +43,18 @@ namespace TalkServer
         }
     }
 
-    [RoleWorker("User")]
+    [ClusterRole("User")]
     public class UserWorker : ClusterRoleWorker
     {
+        private ClusterNodeContext _context;
         private IActorRef _userContainer;
         private ChannelType _channelType;
         private IPEndPoint _listenEndPoint;
         private GatewayRef _gateway;
 
         public UserWorker(ClusterNodeContext context, Config config)
-            : base(context)
         {
+            _context = context;
             _channelType = (ChannelType)Enum.Parse(typeof(ChannelType), config.GetString("type", "Tcp"));
             _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetInt("port", 0));
         }
@@ -84,10 +63,10 @@ namespace TalkServer
         {
             // create UserTableContainer
 
-            _userContainer = Context.System.ActorOf(
-                Props.Create(() => new DistributedActorTableContainer<string>("User", Context.ClusterActorDiscovery, null, null, InterfacedPoisonPill.Instance)),
+            _userContainer = _context.System.ActorOf(
+                Props.Create(() => new DistributedActorTableContainer<string>("User", _context.ClusterActorDiscovery, null, null, InterfacedPoisonPill.Instance)),
                 "UserTableContainer");
-            Context.UserTableContainer = new DistributedActorTableContainerRef<string>(_userContainer, TimeSpan.FromSeconds(10));
+            _context.UserTableContainer = new DistributedActorTableContainerRef<string>(_userContainer, TimeSpan.FromSeconds(10));
 
             // create gateway for users to connect to
 
@@ -107,15 +86,15 @@ namespace TalkServer
                     {
                         Tuple.Create(
                             context.ActorOf(Props.Create(() =>
-                                new UserLoginActor(Context, context.Self.Cast<ActorBoundChannelRef>(), GatewayInitiator.GetRemoteEndPoint(connection)))),
+                                new UserLoginActor(_context, context.Self.Cast<ActorBoundChannelRef>(), GatewayInitiator.GetRemoteEndPoint(connection)))),
                             new TaggedType[] { typeof(IUserLogin) },
                             (ActorBindingFlags)0)
                     }
                 };
 
                 _gateway = (_channelType == ChannelType.Tcp)
-                    ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
-                    : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
+                    ? _context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
+                    : _context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
                 await _gateway.Start();
             }
         }
@@ -136,20 +115,21 @@ namespace TalkServer
         }
     }
 
-    [RoleWorker("RoomTable")]
+    [ClusterRole("RoomTable")]
     public class RoomTableWorker : ClusterRoleWorker
     {
+        private ClusterNodeContext _context;
         private IActorRef _roomTable;
 
         public RoomTableWorker(ClusterNodeContext context, Config config)
-            : base(context)
         {
+            _context = context;
         }
 
         public override Task Start()
         {
-            _roomTable = Context.System.ActorOf(
-                Props.Create(() => new DistributedActorTable<string>("Room", Context.ClusterActorDiscovery, null, null)),
+            _roomTable = _context.System.ActorOf(
+                Props.Create(() => new DistributedActorTable<string>("Room", _context.ClusterActorDiscovery, null, null)),
                 "RoomTable");
             return Task.FromResult(true);
         }
@@ -162,9 +142,10 @@ namespace TalkServer
         }
     }
 
-    [RoleWorker("Room")]
+    [ClusterRole("Room")]
     public class RoomWorker : ClusterRoleWorker
     {
+        private ClusterNodeContext _context;
         private IActorRef _roomContainer;
         private ChannelType _channelType;
         private IPEndPoint _listenEndPoint;
@@ -172,8 +153,8 @@ namespace TalkServer
         private GatewayRef _gateway;
 
         public RoomWorker(ClusterNodeContext context, Config config)
-            : base(context)
         {
+            _context = context;
             _channelType = (ChannelType)Enum.Parse(typeof(ChannelType), config.GetString("type", "Tcp"));
             _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetInt("port", 0));
             _connectEndPoint = new IPEndPoint(IPAddress.Parse(config.GetString("address", "127.0.0.1")), config.GetInt("port", 0));
@@ -183,9 +164,9 @@ namespace TalkServer
         {
             // create RoomTableContainer
 
-            _roomContainer = Context.System.ActorOf(
+            _roomContainer = _context.System.ActorOf(
                 Props.Create(() => new DistributedActorTableContainer<string>(
-                    "Room", Context.ClusterActorDiscovery, typeof(RoomActorFactory), new object[] { Context }, InterfacedPoisonPill.Instance)),
+                    "Room", _context.ClusterActorDiscovery, typeof(RoomActorFactory), new object[] { _context }, InterfacedPoisonPill.Instance)),
                 "RoomTableContainer");
 
             // create a gateway for users to join room
@@ -208,8 +189,8 @@ namespace TalkServer
                 };
 
                 _gateway = (_channelType == ChannelType.Tcp)
-                    ? Context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
-                    : Context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
+                    ? _context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
+                    : _context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
                 await _gateway.Start();
             }
         }
@@ -242,20 +223,21 @@ namespace TalkServer
         }
     }
 
-    [RoleWorker("BotTable")]
+    [ClusterRole("BotTable")]
     public class BotTableWorker : ClusterRoleWorker
     {
+        private ClusterNodeContext _context;
         private IActorRef _botTable;
 
         public BotTableWorker(ClusterNodeContext context, Config config)
-            : base(context)
         {
+            _context = context;
         }
 
         public override Task Start()
         {
-            _botTable = Context.System.ActorOf(
-                Props.Create(() => new DistributedActorTable<long>("Bot", Context.ClusterActorDiscovery, typeof(IncrementalIntegerIdGenerator), null)),
+            _botTable = _context.System.ActorOf(
+                Props.Create(() => new DistributedActorTable<long>("Bot", _context.ClusterActorDiscovery, typeof(IncrementalIntegerIdGenerator), null)),
                 "BotTable");
 
             return Task.FromResult(true);
@@ -269,21 +251,22 @@ namespace TalkServer
         }
     }
 
-    [RoleWorker("Bot")]
+    [ClusterRole("Bot")]
     public class BotWorker : ClusterRoleWorker
     {
+        private ClusterNodeContext _context;
         private IActorRef _botContainer;
 
         public BotWorker(ClusterNodeContext context, Config config)
-            : base(context)
         {
+            _context = context;
         }
 
         public override Task Start()
         {
-            _botContainer = Context.System.ActorOf(
+            _botContainer = _context.System.ActorOf(
                 Props.Create(() => new DistributedActorTableContainer<long>(
-                    "Bot", Context.ClusterActorDiscovery, typeof(BotActorFactory), new object[] { Context }, InterfacedPoisonPill.Instance)),
+                    "Bot", _context.ClusterActorDiscovery, typeof(BotActorFactory), new object[] { _context }, InterfacedPoisonPill.Instance)),
                 "BotTableContainer");
 
             return Task.FromResult(true);

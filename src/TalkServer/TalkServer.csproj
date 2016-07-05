@@ -39,6 +39,10 @@
     <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Aim.ClusterNode, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Aim.ClusterNode.0.1.0-beta1\lib\net45\Aim.ClusterNode.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Akka, Version=1.0.8.24, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Akka.1.0.8\lib\net45\Akka.dll</HintPath>
       <Private>True</Private>
@@ -48,7 +52,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Akka.Cluster.Utility, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Akka.Cluster.Utility.0.2.0-beta5\lib\net45\Akka.Cluster.Utility.dll</HintPath>
+      <HintPath>..\..\packages\Akka.Cluster.Utility.0.2.0-beta6\lib\net45\Akka.Cluster.Utility.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Akka.Interfaced, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -174,9 +178,7 @@
     <Compile Include="BotActor.cs" />
     <Compile Include="BotPattern.cs" />
     <Compile Include="ClusterNodeContext.cs" />
-    <Compile Include="ClusterNodeContextUpdater.cs" />
-    <Compile Include="ClusterRoleWorker.cs" />
-    <Compile Include="ClusterRunner.cs" />
+    <Compile Include="ClusterRoleWorkers.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RedisStorage.cs" />

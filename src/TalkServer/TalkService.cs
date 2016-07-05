@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Configuration;
-using Akka.Configuration;
+using Aim.ClusterNode;
 using Akka.Configuration.Hocon;
 using Domain;
 using Topshelf;
@@ -42,6 +42,7 @@ namespace TalkServer
             var section = (AkkaConfigurationSection)ConfigurationManager.GetSection("akka");
             var config = section.AkkaConfig;
             var runner = new ClusterRunner(config, new[] { GetType().Assembly });
+            runner.CreateClusterNodeContext = () => new ClusterNodeContext();
 
             var runnerConfig = config.GetValue("system.runner").GetObject();
             var nodes = runnerConfig.GetKey(_runner ?? "default");

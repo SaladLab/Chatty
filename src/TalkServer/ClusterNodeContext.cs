@@ -1,19 +1,19 @@
-﻿using Akka.Actor;
+﻿using Aim.ClusterNode;
 using Akka.Cluster.Utility;
 
 namespace TalkServer
 {
-    public class ClusterNodeContext
+    public class ClusterNodeContext : ClusterNodeContextBase
     {
-        public ActorSystem System;
-        public IActorRef ClusterActorDiscovery;
-        public IActorRef ClusterNodeContextUpdater;
-
-        // quick access point for actors. but these are shared variables.
-        // if there is a neat way to avoid this dirty hack, please improve it.
+        [ClusterActor("User")]
         public DistributedActorTableRef<string> UserTable;
+
         public DistributedActorTableContainerRef<string> UserTableContainer;
+
+        [ClusterActor("Room")]
         public DistributedActorTableRef<string> RoomTable;
+
+        [ClusterActor("Bot")]
         public DistributedActorTableRef<long> BotTable;
     }
 }
