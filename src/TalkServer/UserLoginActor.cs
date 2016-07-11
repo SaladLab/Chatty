@@ -34,7 +34,7 @@ namespace TalkServer
             if (string.IsNullOrEmpty(password))
                 throw new ResultException(ResultCodeType.ArgumentError);
 
-            // Check account
+            // check account
 
             if (_isInternalAccess == false)
             {
@@ -53,55 +53,35 @@ namespace TalkServer
                 }
             }
 
-            // Make UserActor
+            // try to create user actor with user-id
 
-            IActorRef user;
+            var user = await _clusterContext.UserTable.WithTimeout(TimeSpan.FromSeconds(30)).GetOrCreate(id, new object[] { observer });
+            if (user.Actor == null)
+                throw new ResultException(ResultCodeType.InternalError);
+            if (user.Created == false)
+                throw new ResultException(ResultCodeType.LoginFailedAlreadyConnected);
+
+            // bound actor to this channel or new channel on user gateway
+
+            IRequestTarget boundTarget;
             try
             {
-                user = Context.System.ActorOf(
-                    Props.Create(() => new UserActor(_clusterContext, _channel, id, observer)),
-                    "user_" + id);
+                boundTarget = await _channel.BindActorOrOpenChannel(
+                    user.Actor, new TaggedType[] { typeof(IUser) },
+                    ActorBindingFlags.OpenThenNotification | ActorBindingFlags.CloseThenStop | ActorBindingFlags.StopThenCloseChannel,
+                    "UserGateway", null);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                throw new ResultException(ResultCodeType.LoginFailedAlreadyConnected);
-            }
-
-            // Register User in UserTable
-
-            var registered = false;
-            for (int i = 0; i < 10; i++)
-            {
-                var reply = await _clusterContext.UserTableContainer.Add(id, user);
-                if (reply.Added)
-                {
-                    registered = true;
-                    break;
-                }
-                await Task.Delay(200);
-            }
-            if (registered == false)
-            {
-                user.Tell(InterfacedPoisonPill.Instance);
-                throw new ResultException(ResultCodeType.LoginFailedAlreadyConnected);
-            }
-
-            // Bind user actor to channel, which makes client to communicate with this actor.
-
-            var boundActor = await _channel.BindActor(
-                user.Cast<UserRef>(),
-                ActorBindingFlags.CloseThenStop | ActorBindingFlags.StopThenCloseChannel);
-            if (boundActor == null)
-            {
-                user.Tell(InterfacedPoisonPill.Instance);
-                _logger.Error($"Failed in binding UserActor({id}");
+                _logger.Error($"BindActorOrOpenChannel error (UserId={id})", e);
+                user.Actor.Tell(InterfacedPoisonPill.Instance);
                 throw new ResultException(ResultCodeType.InternalError);
             }
 
-            // After login successfully, stop this
+            // once login done, stop this
             Self.Tell(InterfacedPoisonPill.Instance);
 
-            return boundActor.Cast<UserRef>();
+            return boundTarget.Cast<UserRef>();
         }
     }
 }

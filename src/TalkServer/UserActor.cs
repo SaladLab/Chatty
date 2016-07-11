@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Akka.Cluster.Utility;
 using Akka.Interfaced;
 using Akka.Interfaced.LogFilter;
 using Akka.Interfaced.SlimServer;
@@ -14,7 +13,7 @@ namespace TalkServer
 {
     [Log]
     [ResponsiveException(typeof(ResultException))]
-    public class UserActor : InterfacedActor, IUser, IUserMessasing
+    public class UserActor : InterfacedActor, IActorBoundChannelObserver, IUser, IUserMessasing
     {
         private ILog _logger;
         private ClusterNodeContext _clusterContext;
@@ -23,12 +22,10 @@ namespace TalkServer
         private UserEventObserver _eventObserver;
         private Dictionary<string, RoomRef> _enteredRoomMap;
 
-        public UserActor(ClusterNodeContext clusterContext, ActorBoundChannelRef channel,
-                         string id, IUserEventObserver observer)
+        public UserActor(ClusterNodeContext clusterContext, string id, IUserEventObserver observer)
         {
             _logger = LogManager.GetLogger($"UserActor({id})");
             _clusterContext = clusterContext;
-            _channel = channel;
             _id = id;
             _eventObserver = (UserEventObserver)observer;
             _enteredRoomMap = new Dictionary<string, RoomRef>();
@@ -45,6 +42,23 @@ namespace TalkServer
             foreach (var room in _enteredRoomMap.Values)
                 room.WithNoReply().Exit(_id);
             _enteredRoomMap.Clear();
+        }
+
+        void IActorBoundChannelObserver.ChannelOpen(IActorBoundChannel channel, object tag)
+        {
+            _channel = (ActorBoundChannelRef)channel;
+            if (_id.StartsWith("bot") == false)
+                _eventObserver.Channel = new AkkaReceiverNotificationChannel(((ActorBoundChannelRef)channel).CastToIActorRef());
+        }
+
+        void IActorBoundChannelObserver.ChannelOpenTimeout(object tag)
+        {
+            Self.Tell(InterfacedPoisonPill.Instance);
+        }
+
+        void IActorBoundChannelObserver.ChannelClose(IActorBoundChannel channel, object tag)
+        {
+            _channel = null;
         }
 
         Task<string> IUser.GetId()
@@ -94,26 +108,23 @@ namespace TalkServer
 
             var info = await room.Enter(_id, observer);
 
-            // Bind an room actor to channel
+            // bound actor to this channel or new channel on user gateway
 
-            BoundActorTarget boundActor = null;
-            if (_id.StartsWith("bot") || _id.StartsWith("test"))
+            IRequestTarget boundTarget = null;
+            try
             {
-                // link room and channel directly
-                boundActor = await _channel.BindActor(
-                    room.CastToIActorRef(), new[] { new TaggedType(typeof(IOccupant), _id) });
-            }
-            else
-            {
-                // grant the user to access a room actor via room local gateway
-                var roomGatewayPath = room.CastToIActorRef().Path.Root / "user" / "RoomGateway";
-                var roomGateway = await Context.System.ActorSelection(roomGatewayPath).ResolveOne(TimeSpan.FromSeconds(1));
-                boundActor = await roomGateway.Cast<ActorBoundGatewayRef>().OpenChannel(
+                var gatewayName = _id.StartsWith("bot") ? null : "RoomGateway";
+                boundTarget = await _channel.BindActorOrOpenChannel(
                     room.CastToIActorRef(), new[] { new TaggedType(typeof(IOccupant), _id) },
-                    _id, ActorBindingFlags.OpenThenNotification | ActorBindingFlags.CloseThenNotification);
+                    ActorBindingFlags.OpenThenNotification | ActorBindingFlags.CloseThenNotification,
+                    gatewayName, null);
+            }
+            catch (Exception e)
+            {
+                _logger.Error($"BindActorOrOpenChannel error (Room={name})", e);
             }
 
-            if (boundActor == null)
+            if (boundTarget == null)
             {
                 await room.Exit(_id);
                 _logger.Error($"Failed in binding Occupant");
@@ -121,7 +132,7 @@ namespace TalkServer
             }
 
             _enteredRoomMap[name] = room;
-            return Tuple.Create((IOccupant)boundActor.Cast<OccupantRef>(), info);
+            return Tuple.Create((IOccupant)boundTarget.Cast<OccupantRef>(), info);
         }
 
         async Task IUser.ExitFromRoom(string name)

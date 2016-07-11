@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using Akka.Actor;
-using Akka.Interfaced;
 using Akka.Cluster.Utility;
+using Akka.Interfaced;
+using Domain;
 
 namespace TalkServer
 {
@@ -10,14 +10,19 @@ namespace TalkServer
     {
         public ClusterNodeContext Context { get; private set; }
 
-        private List<IActorRef> _actors = new List<IActorRef>();
-
         public ClusterContextFixture()
         {
+            // force interface assembly to be loaded before creating ProtobufSerializer
+
+            var type = typeof(IUser);
+            if (type == null)
+                throw new InvalidProgramException("!");
         }
 
         public void Initialize(ActorSystem system)
         {
+            DeadRequestProcessingActor.Install(system);
+
             var context = new ClusterNodeContext { System = system };
 
             context.ClusterActorDiscovery = system.ActorOf(Props.Create(
@@ -30,7 +35,7 @@ namespace TalkServer
 
             context.UserTableContainer = new DistributedActorTableContainerRef<string>(system.ActorOf(
                 Props.Create(() => new DistributedActorTableContainer<string>(
-                    "User", context.ClusterActorDiscovery, null, null, InterfacedPoisonPill.Instance)),
+                    "User", context.ClusterActorDiscovery, typeof(UserActorFactory), new object[] { context }, InterfacedPoisonPill.Instance)),
                 "UserTableContainer"));
 
             context.RoomTable = new DistributedActorTableRef<string>(system.ActorOf(

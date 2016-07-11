@@ -194,11 +194,15 @@ namespace TalkServer
                 UserData userData;
                 if (_userMap.TryGetValue(userId, out userData))
                 {
-                    var actorChannel = userData.Observer.Channel as ActorNotificationChannel;
+                    var actorChannel = userData.Observer.Channel as AkkaReceiverNotificationChannel;
                     if (actorChannel != null)
-                        userData.Observer.Channel = new ActorNotificationChannel(((ActorBoundChannelRef)channel).CastToIActorRef());
+                        userData.Observer.Channel = new AkkaReceiverNotificationChannel(((ActorBoundChannelRef)channel).CastToIActorRef());
                 }
             }
+        }
+
+        void IActorBoundChannelObserver.ChannelOpenTimeout(object tag)
+        {
         }
 
         void IActorBoundChannelObserver.ChannelClose(IActorBoundChannel channel, object tag)

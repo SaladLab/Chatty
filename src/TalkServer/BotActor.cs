@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Linq;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Interfaced;
@@ -9,10 +10,11 @@ using Domain;
 
 namespace TalkServer
 {
-    public class BotActor : InterfacedActor, IActorBoundChannelSync, IUserEventObserverAsync, IRoomObserverAsync, IBotService
+    public class BotActor : InterfacedActor, IUserEventObserverAsync, IRoomObserverAsync, IBotService
     {
         private readonly ILog _log;
         private readonly ClusterNodeContext _clusterContext;
+        private ActorBoundChannelRef _channel;
         private BotPattern.Context _patternContext;
         private BotPattern _pattern;
         private UserRef _user;
@@ -34,6 +36,8 @@ namespace TalkServer
         {
             _log = LogManager.GetLogger($"Bot({name})");
             _clusterContext = clusterContext;
+            _channel = Context.InterfacedActorOf(() => new ActorBoundDummyChannel()).Cast<ActorBoundChannelRef>();
+
             Self.Tell(new StartMessage { UserId = name, RoomName = roomName, PatternType = patternType });
         }
 
@@ -43,6 +47,8 @@ namespace TalkServer
 
             if (_user != null)
                 _user.CastToIActorRef().Tell(InterfacedPoisonPill.Instance);
+
+            _channel.WithNoReply().Close();
 
             base.PostStop();
         }
@@ -65,81 +71,63 @@ namespace TalkServer
 
             // login by itself
 
-            var userLogin = Context.ActorOf(Props.Create(() => new UserLoginActor(_clusterContext, Self.Cast<ActorBoundChannelRef>(), new IPEndPoint(IPAddress.None, 0))))
-                                   .Cast<UserLoginRef>().WithRequestWaiter(this);
-            await userLogin.Login(m.UserId, m.UserId, CreateObserver<IUserEventObserver>());
+            await LoginUser(m.UserId);
+            if (_user == null)
+                throw new InvalidOperationException();
 
             // enter room
 
-            await _user.EnterRoom(m.RoomName, CreateObserver<IRoomObserver>());
+            var roomInfo = await _user.EnterRoom(m.RoomName, CreateObserver<IRoomObserver>());
+            _occupant = ((OccupantRef)roomInfo.Item1).WithRequestWaiter(this);
 
             // start bot
 
             await _pattern.OnStart();
         }
 
+        private async Task LoginUser(string userId)
+        {
+            IActorRef user;
+            try
+            {
+                var observer = CreateObserver<IUserEventObserver>();
+                user = Context.System.ActorOf(
+                    Props.Create(() => new UserActor(_clusterContext, userId, observer)),
+                    "user_" + userId);
+            }
+            catch (Exception e)
+            {
+                _log.Error("Failed to create user.", e);
+                return;
+            }
+
+            var registered = false;
+            for (int i = 0; i < 10; i++)
+            {
+                var reply = await _clusterContext.UserTableContainer.Add(userId, user);
+                if (reply.Added)
+                {
+                    registered = true;
+                    break;
+                }
+                await Task.Delay(200);
+            }
+
+            if (registered == false)
+            {
+                _log.Error("Failed to register user.");
+                user.Tell(InterfacedPoisonPill.Instance);
+                return;
+            }
+
+            await _channel.BindActor(user, new TaggedType[] { typeof(IUser) }, ActorBindingFlags.OpenThenNotification);
+            _user = user.Cast<UserRef>().WithRequestWaiter(this);
+        }
+
         [MessageHandler]
         private Task Handle(TimerMessage m)
         {
             return (_pattern != null) ? _pattern.OnTimer() : Task.FromResult(true);
-        }
-
-        void IActorBoundChannelSync.SetTag(object tag)
-        {
-        }
-
-        InterfacedActorRef IActorBoundChannelSync.BindActor(InterfacedActorRef actor, ActorBindingFlags bindingFlags)
-        {
-            var targetActor = ((AkkaActorTarget)actor.Target).Actor;
-
-            var boundActor = ((IActorBoundChannelSync)this).BindActor(targetActor, new TaggedType[] { actor.InterfaceType }, bindingFlags);
-            if (boundActor == null)
-                return null;
-
-            var actorRef = (InterfacedActorRef)Activator.CreateInstance(actor.GetType());
-            InterfacedActorRefModifier.SetTarget(actorRef, boundActor);
-            return actorRef;
-        }
-
-        BoundActorTarget IActorBoundChannelSync.BindActor(IActorRef actor, TaggedType[] types, ActorBindingFlags bindingFlags)
-        {
-            // this actor doesn't work as a normal channel.
-            // it just hooks binding event and save those actors to use later.
-
-            if (types[0].Type == typeof(IUser))
-            {
-                _user = actor.Cast<UserRef>().WithRequestWaiter(this);
-                return new BoundActorTarget(0);
-            }
-
-            if (types[0].Type == typeof(IOccupant))
-            {
-                _occupant = actor.Cast<OccupantRef>().WithRequestWaiter(this);
-                return new BoundActorTarget(0);
-            }
-
-            _log.ErrorFormat("Unexpected bind type. (InterfaceType={0}, Actor={1})",
-                             types[0].Type.FullName, actor);
-            return null;
-        }
-
-        bool IActorBoundChannelSync.UnbindActor(IActorRef actor)
-        {
-            return true;
-        }
-
-        bool IActorBoundChannelSync.BindType(IActorRef actor, TaggedType[] types)
-        {
-            return true;
-        }
-
-        bool IActorBoundChannelSync.UnbindType(IActorRef actor, Type[] types)
-        {
-            return true;
-        }
-
-        void IActorBoundChannelSync.Close()
-        {
         }
 
         Task IUserEventObserverAsync.Invite(string invitorUserId, string roomName)

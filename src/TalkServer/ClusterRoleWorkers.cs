@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -50,6 +49,7 @@ namespace TalkServer
         private IActorRef _userContainer;
         private ChannelType _channelType;
         private IPEndPoint _listenEndPoint;
+        private IPEndPoint _connectEndPoint;
         private GatewayRef _gateway;
 
         public UserWorker(ClusterNodeContext context, Config config)
@@ -57,6 +57,10 @@ namespace TalkServer
             _context = context;
             _channelType = (ChannelType)Enum.Parse(typeof(ChannelType), config.GetString("type", "Tcp"));
             _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetInt("port", 0));
+
+            var connectAddress = config.GetString("connect-address");
+            var connectPort = config.GetInt("connect-port", _listenEndPoint.Port);
+            _connectEndPoint = new IPEndPoint(connectAddress != null ? IPAddress.Parse(connectAddress) : IPAddress.Loopback, connectPort);
         }
 
         public override async Task Start()
@@ -64,9 +68,10 @@ namespace TalkServer
             // create UserTableContainer
 
             _userContainer = _context.System.ActorOf(
-                Props.Create(() => new DistributedActorTableContainer<string>("User", _context.ClusterActorDiscovery, null, null, InterfacedPoisonPill.Instance)),
+                Props.Create(() => new DistributedActorTableContainer<string>(
+                    "User", _context.ClusterActorDiscovery, typeof(UserActorFactory), new object[] { _context }, InterfacedPoisonPill.Instance)),
                 "UserTableContainer");
-            _context.UserTableContainer = new DistributedActorTableContainerRef<string>(_userContainer, TimeSpan.FromSeconds(10));
+            _context.UserTableContainer = new DistributedActorTableContainerRef<string>(_userContainer);
 
             // create gateway for users to connect to
 
@@ -78,18 +83,12 @@ namespace TalkServer
                 var initiator = new GatewayInitiator
                 {
                     ListenEndPoint = _listenEndPoint,
+                    ConnectEndPoint = _connectEndPoint,
+                    TokenRequired = true,
                     GatewayLogger = LogManager.GetLogger(name),
                     CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep})"),
                     ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
                     PacketSerializer = serializer,
-                    CreateInitialActors = (context, connection) => new[]
-                    {
-                        Tuple.Create(
-                            context.ActorOf(Props.Create(() =>
-                                new UserLoginActor(_context, context.Self.Cast<ActorBoundChannelRef>(), GatewayInitiator.GetRemoteEndPoint(connection)))),
-                            new TaggedType[] { typeof(IUserLogin) },
-                            (ActorBindingFlags)0)
-                    }
                 };
 
                 _gateway = (_channelType == ChannelType.Tcp)
@@ -105,13 +104,82 @@ namespace TalkServer
 
             if (_gateway != null)
             {
-                await _gateway.Stop();
-                await _gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
+                await _gateway.CastToIActorRef().GracefulStop(
+                    TimeSpan.FromSeconds(10),
+                    InterfacedMessageBuilder.Request<IGateway>(x => x.Stop()));
             }
 
             // stop user container
 
             await _userContainer.GracefulStop(TimeSpan.FromSeconds(10), PoisonPill.Instance);
+        }
+    }
+
+    public class UserActorFactory : IActorFactory
+    {
+        private ClusterNodeContext _clusterContext;
+
+        public void Initialize(object[] args)
+        {
+            _clusterContext = (ClusterNodeContext)args[0];
+        }
+
+        public IActorRef CreateActor(IActorRefFactory actorRefFactory, object id, object[] args)
+        {
+            return actorRefFactory.ActorOf(Props.Create(() => new UserActor(_clusterContext, (string)id, (IUserEventObserver)args[0])));
+        }
+    }
+
+    [ClusterRole("UserLogin")]
+    public class UserLoginWorker : ClusterRoleWorker
+    {
+        private ClusterNodeContext _context;
+        private ChannelType _channelType;
+        private IPEndPoint _listenEndPoint;
+        private GatewayRef _gateway;
+
+        public UserLoginWorker(ClusterNodeContext context, Config config)
+        {
+            _context = context;
+            _channelType = (ChannelType)Enum.Parse(typeof(ChannelType), config.GetString("type", "Tcp"));
+            _listenEndPoint = new IPEndPoint(IPAddress.Any, config.GetInt("port", 0));
+        }
+
+        public override async Task Start()
+        {
+            var serializer = PacketSerializer.CreatePacketSerializer();
+
+            var name = "UserLoginGateway";
+            var initiator = new GatewayInitiator
+            {
+                ListenEndPoint = _listenEndPoint,
+                GatewayLogger = LogManager.GetLogger(name),
+                CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep}"),
+                ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
+                PacketSerializer = serializer,
+                CreateInitialActors = (context, connection) => new[]
+                {
+                    Tuple.Create(
+                        context.ActorOf(Props.Create(() =>
+                            new UserLoginActor(_context, context.Self.Cast<ActorBoundChannelRef>(), GatewayInitiator.GetRemoteEndPoint(connection)))),
+                        new TaggedType[] { typeof(IUserLogin) },
+                        ActorBindingFlags.CloseThenStop | ActorBindingFlags.StopThenCloseChannel)
+                }
+            };
+
+            _gateway = (_channelType == ChannelType.Tcp)
+                ? _context.System.ActorOf(Props.Create(() => new TcpGateway(initiator)), name).Cast<GatewayRef>()
+                : _context.System.ActorOf(Props.Create(() => new UdpGateway(initiator)), name).Cast<GatewayRef>();
+            await _gateway.Start();
+        }
+
+        public override async Task Stop()
+        {
+            // stop gateway
+
+            await _gateway.CastToIActorRef().GracefulStop(
+                TimeSpan.FromSeconds(10),
+                InterfacedMessageBuilder.Request<IGateway>(x => x.Stop()));
         }
     }
 
@@ -199,8 +267,9 @@ namespace TalkServer
         {
             // stop gateway
 
-            await _gateway.Stop();
-            await _gateway.CastToIActorRef().GracefulStop(TimeSpan.FromSeconds(10), new Identify(0));
+            await _gateway.CastToIActorRef().GracefulStop(
+                TimeSpan.FromSeconds(10),
+                InterfacedMessageBuilder.Request<IGateway>(x => x.Stop()));
 
             // stop room container
 
