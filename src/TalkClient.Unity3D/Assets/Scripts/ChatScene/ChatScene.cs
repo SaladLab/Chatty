@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
-using Domain;
+using System.Linq;
 using Akka.Interfaced;
 using Akka.Interfaced.SlimSocket.Client;
+using Domain;
+using UnityEngine;
 
 public class ChatScene : MonoBehaviour, IUserEventObserver
 {
@@ -52,7 +53,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
             var loginDialog = UiManager.Instance.ShowModalRoot<LoginDialog>(this);
             yield return StartCoroutine(loginDialog.WaitForHide());
 
-            G.Communicator.Channel.StateChanged += (_, state) => { if (state == ChannelStateType.Closed) ChannelEventDispatcher.Post(OnChannelClose, _); };
+            G.Communicator.Channels.Last().StateChanged += (_, state) => { if (state == ChannelStateType.Closed) ChannelEventDispatcher.Post(OnChannelClose, _); };
 
             if (loginDialog.ReturnValue != null)
             {
@@ -81,7 +82,6 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
         // clear global connection state and try to reconnect
 
-        G.Communicator.Channel.Close();
         G.Communicator = null;
         G.User = null;
         G.UserId = null;
@@ -100,9 +100,9 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
     private void OnLogoutButtonClick()
     {
-        if (G.Communicator.Channel != null)
+        if (G.Communicator.Channels != null)
         {
-            G.Communicator.Channel.Close();
+            G.Communicator.Channels[0].Close();
         }
     }
 
@@ -165,7 +165,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
         var observer = G.Communicator.ObserverRegistry.Create<IRoomObserver>(chatPanel);
         observer.GetEventDispatcher().Pending = true;
-        observer.GetEventDispatcher().KeepingOrder= true;
+        observer.GetEventDispatcher().KeepingOrder = true;
         var t1 = user.EnterRoom(roomName, observer);
         yield return t1.WaitHandle;
 
@@ -256,7 +256,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
             Destroy(item.ChatPanel.gameObject);
             G.Communicator.ObserverRegistry.Remove(item.Observer);
             ControlPanel.DeleteRoomItem(roomName);
-            if (item.Channel != G.Communicator.Channel)
+            if (item.Channel != G.Communicator.Channels[0])
                 item.Channel.Close();
 
             OnRoomItemClick("#general");

@@ -76,15 +76,15 @@ public class LoginDialog : UiDialog
             {
                 var channelFactory = communicator.ChannelFactory;
                 channelFactory.Type = ChannelType.Tcp;
-                channelFactory.ConnectEndPoint = new IPEndPoint(IPAddress.Loopback, 9001);
+                channelFactory.ConnectEndPoint = serverEndPoint;
                 channelFactory.CreateChannelLogger = () => LogManager.GetLogger("Channel");
                 channelFactory.PacketSerializer = PacketSerializer.CreatePacketSerializer<DomainProtobufSerializer>();
             }
-            communicator.CreateChannel();
+            var channel = communicator.CreateChannel();
 
             // connect to gateway
 
-            var t0 = communicator.Channel.ConnectAsync();
+            var t0 = channel.ConnectAsync();
             yield return t0.WaitHandle;
             if (t0.Exception != null)
             {
@@ -94,7 +94,7 @@ public class LoginDialog : UiDialog
 
             // Try Login
 
-            var userLogin = communicator.Channel.CreateRef<UserLoginRef>();
+            var userLogin = channel.CreateRef<UserLoginRef>();
             var observer = communicator.ObserverRegistry.Create(_userEventObserver);
             var t1 = userLogin.Login(id, password, observer);
             yield return t1.WaitHandle;
@@ -106,12 +106,26 @@ public class LoginDialog : UiDialog
                     UiMessageBox.ShowMessageBox("Login error:\n" + re.ResultCode.ToString());
                 else
                     UiMessageBox.ShowMessageBox("Login error:\n" + t1.Exception.ToString());
-                communicator.Channel.Close();
+                channel.Close();
                 yield break;
             }
 
+            var user = (UserRef)t1.Result;
+            if (user.IsChannelConnected() == false)
+            {
+                var t2 = user.ConnectChannelAsync();
+                yield return t2.WaitHandle;
+                if (t2.Exception != null)
+                {
+                    UiMessageBox.ShowMessageBox("ConnectToUser error:\n" + t2.Exception.ToString());
+                    channel.Close();
+                    yield break;
+                }
+                channel.Close();
+            }
+
             G.Communicator = communicator;
-            G.User = (UserRef)t1.Result;
+            G.User = user;
             G.UserId = id;
             Hide(id);
         }

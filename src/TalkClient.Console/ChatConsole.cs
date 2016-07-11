@@ -30,8 +30,7 @@ namespace TalkClient.Console
         {
             _comm = commnuicator;
 
-            _comm.CreateChannel();
-            _comm.Channel.StateChanged += (_, state) => { if (state == ChannelStateType.Closed) _channelCloseCts?.Cancel(); };
+            var channel = _comm.CreateChannel();
 
             ConsoleUtil.Out("[ Chatty.Console ]");
             ConsoleUtil.Out("");
@@ -39,7 +38,7 @@ namespace TalkClient.Console
             ConsoleUtil.Out("Try to connect...");
             try
             {
-                await _comm.Channel.ConnectAsync();
+                await channel.ConnectAsync();
             }
             catch (Exception e)
             {
@@ -70,13 +69,16 @@ namespace TalkClient.Console
 
         private async Task<bool> LoginAsync(string userId, string password)
         {
-            var userLogin = _comm.Channel.CreateRef<UserLoginRef>();
+            var userLogin = _comm.Channels[0].CreateRef<UserLoginRef>();
             var observer = _comm.ObserverRegistry.Create<IUserEventObserver>(this);
 
             try
             {
                 _user = (UserRef)(await userLogin.Login(userId, password, observer));
+                if (_user.IsChannelConnected() == false)
+                    await _user.ConnectChannelAsync();
                 _userEventObserver = (UserEventObserver)observer;
+                _comm.Channels.Last().StateChanged += (_, state) => { if (state == ChannelStateType.Closed) _channelCloseCts?.Cancel(); };
                 ConsoleUtil.Sys($"{userId} logined.");
                 return true;
             }
@@ -346,8 +348,8 @@ namespace TalkClient.Console
             {
                 var ret = await _user.EnterRoom(name, observer);
                 var occupant = (OccupantRef)ret.Item1;
-                if (occupant.RequestWaiter != _comm.Channel)
-                    await ((IChannel)occupant.RequestWaiter).ConnectAsync();
+                if (occupant.IsChannelConnected() == false)
+                    await occupant.ConnectChannelAsync();
                 _roomMap.Add(name, new RoomItem
                 {
                     Occupant = occupant,
@@ -375,7 +377,7 @@ namespace TalkClient.Console
             _comm.ObserverRegistry.Remove(item.Observer);
             _roomMap.Remove(name);
 
-            if (item.Channel != _comm.Channel)
+            if (item.Channel != _comm.Channels[0])
                 item.Channel.Close();
         }
 
