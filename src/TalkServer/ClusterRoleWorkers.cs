@@ -31,7 +31,7 @@ namespace TalkServer
             _userTable = _context.System.ActorOf(
                 Props.Create(() => new DistributedActorTable<string>("User", _context.ClusterActorDiscovery, null, null)),
                 "UserTable");
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public override async Task Stop()
@@ -175,8 +175,6 @@ namespace TalkServer
 
         public override async Task Stop()
         {
-            // stop gateway
-
             await _gateway.CastToIActorRef().GracefulStop(
                 TimeSpan.FromSeconds(10),
                 InterfacedMessageBuilder.Request<IGateway>(x => x.Stop()));
@@ -199,7 +197,7 @@ namespace TalkServer
             _roomTable = _context.System.ActorOf(
                 Props.Create(() => new DistributedActorTable<string>("Room", _context.ClusterActorDiscovery, null, null)),
                 "RoomTable");
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public override async Task Stop()
@@ -250,7 +248,6 @@ namespace TalkServer
                     ConnectEndPoint = _connectEndPoint,
                     GatewayLogger = LogManager.GetLogger(name),
                     TokenRequired = true,
-                    TokenTimeout = TimeSpan.FromMinutes(1),
                     CreateChannelLogger = (ep, _) => LogManager.GetLogger($"Channel({ep})"),
                     ConnectionSettings = new TcpConnectionSettings { PacketSerializer = serializer },
                     PacketSerializer = serializer,
@@ -309,7 +306,7 @@ namespace TalkServer
                 Props.Create(() => new DistributedActorTable<long>("Bot", _context.ClusterActorDiscovery, typeof(IncrementalIntegerIdGenerator), null)),
                 "BotTable");
 
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public override async Task Stop()
@@ -338,7 +335,7 @@ namespace TalkServer
                     "Bot", _context.ClusterActorDiscovery, typeof(BotActorFactory), new object[] { _context }, InterfacedPoisonPill.Instance)),
                 "BotTableContainer");
 
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public override async Task Stop()

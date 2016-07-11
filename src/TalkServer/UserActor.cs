@@ -215,19 +215,19 @@ namespace TalkServer
             if (_clusterContext.BotTable != null)
                 _clusterContext.BotTable.Create(new object[] { roomName, type });
 
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         Task IUserMessasing.Whisper(ChatItem chatItem)
         {
             _eventObserver.Whisper(chatItem);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         Task IUserMessasing.Invite(string invitorUserId, string roomName)
         {
             _eventObserver.Invite(invitorUserId, roomName);
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
     }
 }

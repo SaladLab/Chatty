@@ -34,37 +34,37 @@ namespace TalkServer
 
         public virtual Task OnStart()
         {
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public virtual Task OnTimer()
         {
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public virtual Task OnInvite(string invitorUserId, string roomName)
         {
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public virtual Task OnWhisper(ChatItem chatItem)
         {
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public virtual Task OnEnter(string userId)
         {
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public virtual Task OnExit(string userId)
         {
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         public virtual Task OnSay(ChatItem chatItem)
         {
-            return Task.FromResult(true);
+            return Task.CompletedTask;
         }
 
         protected Task SayAsync(string message)
@@ -136,7 +136,7 @@ namespace TalkServer
             if (chatItem.Message.ToLower() == "kill")
                 _context.Service.Kill();
 
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         public override async Task OnSay(ChatItem chatItem)
@@ -202,7 +202,7 @@ namespace TalkServer
             if (chatItem.Message.ToLower() == "kill")
                 _context.Service.Kill();
 
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
 
         public override Task OnStart()

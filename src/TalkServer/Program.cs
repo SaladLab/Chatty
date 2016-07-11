@@ -12,9 +12,9 @@ namespace TalkServer
                 string runner = null;
                 x.AddCommandLineDefinition("runner", val => runner = val);
 
-                x.SetServiceName("TalkServer");
-                x.SetDisplayName("TalkServer for Chatty");
-                x.SetDescription("TalkServer for Chatty using Akka.NET and Akka.Interfaced.");
+                x.SetServiceName("Chatty");
+                x.SetDisplayName("Chatty Service");
+                x.SetDescription("Chatty Service using Akka.NET and Akka.Interfaced. (https://github.com/SaladLab/Chatty)");
 
                 x.UseAssemblyInfoForServiceInfo();
                 x.RunAsLocalSystem();

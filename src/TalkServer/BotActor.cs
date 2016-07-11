@@ -127,32 +127,32 @@ namespace TalkServer
         [MessageHandler]
         private Task Handle(TimerMessage m)
         {
-            return (_pattern != null) ? _pattern.OnTimer() : Task.FromResult(true);
+            return (_pattern != null) ? _pattern.OnTimer() : Task.CompletedTask;
         }
 
         Task IUserEventObserverAsync.Invite(string invitorUserId, string roomName)
         {
-            return (_pattern != null) ? _pattern.OnInvite(invitorUserId, roomName) : Task.FromResult(true);
+            return (_pattern != null) ? _pattern.OnInvite(invitorUserId, roomName) : Task.CompletedTask;
         }
 
         Task IUserEventObserverAsync.Whisper(ChatItem chatItem)
         {
-            return (_pattern != null) ? _pattern.OnWhisper(chatItem) : Task.FromResult(true);
+            return (_pattern != null) ? _pattern.OnWhisper(chatItem) : Task.CompletedTask;
         }
 
         Task IRoomObserverAsync.Enter(string userId)
         {
-            return (_pattern != null) ? _pattern.OnEnter(userId) : Task.FromResult(true);
+            return (_pattern != null) ? _pattern.OnEnter(userId) : Task.CompletedTask;
         }
 
         Task IRoomObserverAsync.Exit(string userId)
         {
-            return (_pattern != null) ? _pattern.OnExit(userId) : Task.FromResult(true);
+            return (_pattern != null) ? _pattern.OnExit(userId) : Task.CompletedTask;
         }
 
         Task IRoomObserverAsync.Say(ChatItem chatItem)
         {
-            return (_pattern != null && chatItem.UserId != _patternContext.UserId) ? _pattern.OnSay(chatItem) : Task.FromResult(true);
+            return (_pattern != null && chatItem.UserId != _patternContext.UserId) ? _pattern.OnSay(chatItem) : Task.CompletedTask;
         }
 
         async Task IBotService.SayAsync(string message)
