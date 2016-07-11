@@ -151,6 +151,7 @@ namespace TalkServer
             // Unbind an room actor from channel
 
             _channel.WithNoReply().UnbindActor(room.CastToIActorRef());
+
             _enteredRoomMap.Remove(name);
         }
 
