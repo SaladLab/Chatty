@@ -10,7 +10,7 @@ public static class G
         _logger = LogManager.GetLogger("G");
     }
 
-    // Channel
+    // Communicator
 
     private static Communicator _communicator;
 
