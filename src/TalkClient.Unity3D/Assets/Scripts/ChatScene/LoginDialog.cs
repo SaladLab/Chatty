@@ -75,7 +75,7 @@ public class LoginDialog : UiDialog
             var communicator = UnityCommunicatorFactory.Create();
             {
                 var channelFactory = communicator.ChannelFactory;
-                channelFactory.Type = ChannelType.Tcp;
+                channelFactory.Type = type;
                 channelFactory.ConnectEndPoint = serverEndPoint;
                 channelFactory.CreateChannelLogger = () => LogManager.GetLogger("Channel");
                 channelFactory.PacketSerializer = PacketSerializer.CreatePacketSerializer<DomainProtobufSerializer>();
