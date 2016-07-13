@@ -68,7 +68,7 @@ public class LoginDialog : UiDialog
             }
             catch (Exception e)
             {
-                UiMessageBox.ShowMessageBox("Server address error:\n" + e.ToString());
+                UiMessageBox.Show("Server address error:\n" + e.ToString());
                 yield break;
             }
 
@@ -88,7 +88,7 @@ public class LoginDialog : UiDialog
             yield return t0.WaitHandle;
             if (t0.Exception != null)
             {
-                UiMessageBox.ShowMessageBox("Connect error:\n" + t0.Exception.Message);
+                UiMessageBox.Show("Connect error:\n" + t0.Exception.Message);
                 yield break;
             }
 
@@ -103,9 +103,9 @@ public class LoginDialog : UiDialog
                 communicator.ObserverRegistry.Remove(observer);
                 var re = t1.Exception as ResultException;
                 if (re != null)
-                    UiMessageBox.ShowMessageBox("Login error:\n" + re.ResultCode.ToString());
+                    UiMessageBox.Show("Login error:\n" + re.ResultCode.ToString());
                 else
-                    UiMessageBox.ShowMessageBox("Login error:\n" + t1.Exception.ToString());
+                    UiMessageBox.Show("Login error:\n" + t1.Exception.ToString());
                 channel.Close();
                 yield break;
             }
@@ -117,7 +117,7 @@ public class LoginDialog : UiDialog
                 yield return t2.WaitHandle;
                 if (t2.Exception != null)
                 {
-                    UiMessageBox.ShowMessageBox("ConnectToUser error:\n" + t2.Exception.ToString());
+                    UiMessageBox.Show("ConnectToUser error:\n" + t2.Exception.ToString());
                     channel.Close();
                     yield break;
                 }

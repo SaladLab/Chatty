@@ -124,7 +124,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
 
             if (t1.Exception != null)
             {
-                UiMessageBox.ShowMessageBox("GetRoomList error:\n" + t1.Exception.Message);
+                UiMessageBox.Show("GetRoomList error:\n" + t1.Exception.Message);
                 yield break;
             }
 
@@ -173,7 +173,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
         {
             G.Communicator.ObserverRegistry.Remove(observer);
             DestroyObject(go);
-            UiMessageBox.ShowMessageBox("Enter room error:\n" + t1.Exception);
+            UiMessageBox.Show("Enter room error:\n" + t1.Exception);
             yield break;
         }
 
@@ -244,7 +244,7 @@ public class ChatScene : MonoBehaviour, IUserEventObserver
             yield return t1.WaitHandle;
             if (t1.Status != TaskStatus.RanToCompletion)
             {
-                UiMessageBox.ShowMessageBox("Exit room error:\n" + t1.Exception.ToString());
+                UiMessageBox.Show("Exit room error:\n" + t1.Exception.ToString());
                 yield break;
             }
 
